@@ -1,7 +1,9 @@
 ﻿#include <iostream>
-
+#include <logger.hpp>
 int main()
 {
-    std::cout << "Hello, World!" << std::endl;
+    core::Logger::Init();
+    GL_INFO("Hello, GLRenderer!");
+
     return 0;
 }
