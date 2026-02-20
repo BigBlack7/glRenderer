@@ -5,9 +5,13 @@
 namespace core
 {
     std::shared_ptr<spdlog::logger> Logger::mLogger;
+    bool Logger::mInitialized = false;
 
     void Logger::Init()
     {
+        if (mInitialized)
+            return; // 防止重复初始化
+        
         // 设置控制台编码为UTF-8, 避免中文日志乱码
         SetConsoleOutputCP(CP_UTF8);
         SetConsoleCP(CP_UTF8);
@@ -18,5 +22,17 @@ namespace core
         mLogger = std::make_shared<spdlog::logger>("glRenderer", consoleSink);
         mLogger->set_level(spdlog::level::trace); // 输出所有级别
         mLogger->flush_on(spdlog::level::warn);   // WARN 及以上即时刷新
+
+        mInitialized = true;
+    }
+
+    void Logger::Shutdown()
+    {
+        if (mInitialized && mLogger)
+        {
+            mLogger->flush(); // 确保所有日志都写入
+            mLogger.reset();
+            mInitialized = false;
+        }
     }
 }

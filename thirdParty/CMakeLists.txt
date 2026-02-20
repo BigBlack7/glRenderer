@@ -43,6 +43,7 @@ option(ASSIMP_BUILD_DRACO OFF)
 option(ASSIMP_WARNINGS_AS_ERRORS OFF)
 option(ASSIMP_INSTALL OFF)
 option(ASSIMP_NO_EXPORT OFF)
+option(USE_STATIC_CRT OFF)
 add_subdirectory(assimp)
 
 # tinyexr

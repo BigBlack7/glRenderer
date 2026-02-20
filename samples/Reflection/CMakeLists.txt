@@ -1,10 +1,10 @@
 ﻿project(Reflection)
 
-file(GLOB_RECURSE REFLECTION CONFIGURE_DEPENDS
+file(GLOB_RECURSE MAIN CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp"
 )
 
-add_executable(Reflection ${REFLECTION})
+add_executable(Reflection ${MAIN})
 
-# target_link_libraries(Reflection PRIVATE core)
+target_link_libraries(Reflection PRIVATE core)

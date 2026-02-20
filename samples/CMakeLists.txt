@@ -1,2 +1,3 @@
 ﻿add_subdirectory(Primitives)
 add_subdirectory(Reflection)
+add_subdirectory(Fuse)
