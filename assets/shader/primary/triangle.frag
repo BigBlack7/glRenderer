@@ -3,12 +3,17 @@ out vec4 PixelColor;
 
 // in
 in vec3 color;
+in vec2 uv;
 
 // uniform
-uniform float time;
-uniform vec3 icolor;
+uniform sampler2D grassSampler;
+uniform sampler2D landSampler;
+uniform sampler2D noiseSampler;
 
 void main()
 {
-    PixelColor = vec4(icolor * (0.5 + 0.5 * sin(time)), 1.0);
+    vec4 grassColor = texture(grassSampler, uv);
+    vec4 landColor = texture(landSampler, uv);
+    float weight = texture(noiseSampler, uv).r;
+    PixelColor = vec4(mix(grassColor.rgb, landColor.rgb, weight), 1.0);
 }

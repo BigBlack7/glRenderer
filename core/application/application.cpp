@@ -39,7 +39,7 @@ namespace core
 
     Application &Application::GetInstance()
     {
-        // Meyers' Singleton,  (cpp11)静态局部变量初始化是线程安全的
+        // Meyers' Singleton, (cpp11)静态局部变量初始化是线程安全的
         static Application instance;
         return instance;
     }

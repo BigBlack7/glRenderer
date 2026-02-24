@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
 #include <string>
 #include <string_view>
 #include <filesystem>
@@ -68,12 +69,15 @@ namespace core
         void Begin() const noexcept;
         void End() const noexcept;
 
+        /* getter */
         GLuint GetID() const noexcept { return mProgram; }
 
         /* setter -> 通过着色器程序ID和uniform变量名获取uniform变量的位置, 然后设置uniform变量的值为value */
         void SetFloat(std::string_view name, float value) const;
         void SetVec3(std::string_view name, float x, float y, float z) const;
         void SetVec3(std::string_view name, const float *value) const;
+        void SetVec3(std::string_view name, const glm::vec3 &value) const;
         void SetInt(std::string_view name, int value) const;
+        void SetMat4(std::string_view name, const glm::mat4 &value) const;
     };
 }

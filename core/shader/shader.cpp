@@ -1,12 +1,13 @@
 ﻿#include "shader.hpp"
 #include <utils/logger.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
 
 namespace core
 {
-    namespace glsl
+    namespace detail
     {
         /// @brief 着色器文件根目录
         const std::filesystem::path ShaderRoot = "../../../assets/shader/";
@@ -39,6 +40,7 @@ namespace core
             std::string infoLog(static_cast<size_t>(logLen > 1 ? logLen : 1), '\0');
             glGetShaderInfoLog(target, logLen, nullptr, infoLog.data());
             GL_ERROR("[Shader] File Compile Error: {}\n{}", debugName, infoLog);
+            throw std::runtime_error("Abort At CheckShaderError 1!");
         }
         else
         {
@@ -52,6 +54,7 @@ namespace core
             glGetProgramInfoLog(target, logLen, nullptr, infoLog.data());
 
             GL_ERROR("[Shader] Program Link Error: {}\n{}", debugName, infoLog);
+            throw std::runtime_error("Abort At CheckShaderError 2!");
         }
     }
 
@@ -60,7 +63,7 @@ namespace core
         std::filesystem::path p(filePath);
         if (p.is_absolute()) // 如果是绝对路径则直接返回
             return p;
-        return glsl::ShaderRoot / p;
+        return detail::ShaderRoot / p;
     }
 
     std::string Shader::LoadShaderRecursive(const std::filesystem::path &filePath, std::unordered_set<std::string> &includeGuard)
@@ -71,14 +74,16 @@ namespace core
         // 循环包含检测: A -> B -> A, 检查当前文件是否已在处理栈中
         if (includeGuard.find(normalized) != includeGuard.end())
         {
-            throw std::runtime_error("Shader #include Cycle Detected: " + normalized);
+            GL_CRITICAL("[Shader] #include Cycle Detected: {}", normalized);
+            throw std::runtime_error("Abort At LoadShaderRecursive 1!");
         }
 
         // 打开文件
         std::ifstream file(filePath);
         if (!file.is_open())
         {
-            throw std::runtime_error("Shader File Open Failed: " + filePath.string());
+            GL_CRITICAL("[Shader] File Open Failed: {}", filePath.string());
+            throw std::runtime_error("Abort At LoadShaderRecursive 2!");
         }
 
         // 将当前文件加入"正在处理"集合, 防止递归调用时的循环包含
@@ -91,7 +96,7 @@ namespace core
         while (std::getline(file, line))
         {
             ++lineNo;
-            const std::string trimmed = glsl::TrimLeft(line);
+            const std::string trimmed = detail::TrimLeft(line);
 
             // 处理#include指令
             if (trimmed.rfind("#include", 0) == 0)
@@ -103,7 +108,8 @@ namespace core
                 {
                     // 解析失败, 抛出异常并从includeGuard中移除当前文件, 以允许后续正确包含
                     includeGuard.erase(normalized);
-                    throw std::runtime_error("Bad #include Syntax: " + filePath.string() + ":" + std::to_string(lineNo));
+                    GL_CRITICAL("[Shader] Bad #include Syntax: {}:{}\n{}", filePath.string(), lineNo, line);
+                    throw std::runtime_error("Abort At LoadShaderRecursive 3!");
                 }
 
                 // 按当前文件目录解析相对路径(获取文件名并拼接到当前文件目录)
@@ -147,7 +153,7 @@ namespace core
 
         if (location < 0)
         {
-            // 记录未找到的uniform变量，避免重复警告刷屏
+            // 记录未找到的uniform变量, 避免重复警告刷屏
             if (mMissingUniformWarned.insert(key).second)
             {
                 GL_WARN("[Shader] Uniform Not Found or Optimized Out: {}", key);
@@ -178,45 +184,30 @@ namespace core
 
         GLuint vertex = 0;
         GLuint fragment = 0;
-        GLuint program = 0;
 
-        try
-        {
-            // 生成顶点与片元着色器句柄
-            vertex = glCreateShader(GL_VERTEX_SHADER);
-            fragment = glCreateShader(GL_FRAGMENT_SHADER);
-    
-            // 绑定着色器源代码到着色器句柄
-            glShaderSource(vertex, 1, &vertexShaderSource, NULL);
-            glShaderSource(fragment, 1, &fragmentShaderSource, NULL);
-    
-            // 编译着色器代码以及检查错误
-            glCompileShader(vertex);
-            CheckShaderError(vertex, CheckType::Compile, vertexPath);
-            glCompileShader(fragment);
-            CheckShaderError(fragment, CheckType::Compile, fragmentPath);
+        // 生成顶点与片元着色器句柄
+        vertex = glCreateShader(GL_VERTEX_SHADER);
+        fragment = glCreateShader(GL_FRAGMENT_SHADER);
 
-            // 创建着色器程序句柄
-            program = glCreateProgram();
-            // 将编译后的着色器代码绑定到着色器程序句柄
-            glAttachShader(program, vertex);
-            glAttachShader(program, fragment);
-            // 链接着色器程序以及检查错误
-            glLinkProgram(program);
-            CheckShaderError(program, CheckType::Link, "Program");
-            // 只有在成功链接后才将程序句柄赋值给成员变量, 以确保析构函数正确释放资源
-            mProgram = program; 
-        }
-        catch(...)
-        {
-            if (program)
-                glDeleteProgram(program);
-            if (vertex)
-                glDeleteShader(vertex);
-            if (fragment)
-                glDeleteShader(fragment);
-            throw;
-        }
+        // 绑定着色器源代码到着色器句柄
+        glShaderSource(vertex, 1, &vertexShaderSource, NULL);
+        glShaderSource(fragment, 1, &fragmentShaderSource, NULL);
+
+        // 编译着色器代码以及检查错误
+        glCompileShader(vertex);
+        CheckShaderError(vertex, CheckType::Compile, vertexPath);
+        glCompileShader(fragment);
+        CheckShaderError(fragment, CheckType::Compile, fragmentPath);
+
+        // 创建着色器程序句柄
+        mProgram = glCreateProgram();
+        // 将编译后的着色器代码绑定到着色器程序句柄
+        glAttachShader(mProgram, vertex);
+        glAttachShader(mProgram, fragment);
+        // 链接着色器程序以及检查错误
+        glLinkProgram(mProgram);
+        CheckShaderError(mProgram, CheckType::Link, "Program");
+
         // 删除着色器对象, 因为它们已经链接到程序对象上了, 不再需要
         glDeleteShader(vertex);
         glDeleteShader(fragment);
@@ -259,10 +250,24 @@ namespace core
             glUniform3fv(location, 1, value); // 第二个参数count表示要设置的vec3数量, 这里是1个vec3, 因此传入1
     }
 
+    void Shader::SetVec3(std::string_view name, const glm::vec3 &value) const
+    {
+        const GLint location = GetUniformLocation(name);
+        if (location >= 0)
+            glUniform3fv(location, 1, glm::value_ptr(value)); // glm::vec3在内存中是连续存储的, 可以直接传入地址
+    }
+
     void Shader::SetInt(std::string_view name, int value) const
     {
         const GLint location = GetUniformLocation(name);
         if (location >= 0)
             glUniform1i(location, value);
+    }
+
+    void Shader::SetMat4(std::string_view name, const glm::mat4 &value) const
+    {
+        const GLint location = GetUniformLocation(name);
+        if (location >= 0)
+            glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(value)); // glm::mat4在内存中是连续存储的, 可以直接传入地址; GL_FALSE表示不进行转置, 因为glm默认是列主序(OpenGL也是列主序)
     }
 }
