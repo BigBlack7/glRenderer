@@ -8,7 +8,10 @@
 namespace core
 {
     using ResizeCallback = std::function<void(uint32_t width, uint32_t height)>;
-    using KeyBoardCallback = std::function<void(GLFWwindow *window, int key, int scancode, int action, int mods)>;
+    using KeyCallback = std::function<void(GLFWwindow *window, int key, int scancode, int action, int mods)>;
+    using MouseCallback = std::function<void(GLFWwindow *window, int button, int action, int mods)>;
+    using CursorCallback = std::function<void(GLFWwindow *window, double xpos, double ypos)>;
+    using ScrollCallback = std::function<void(GLFWwindow *window, double xoffset, double yoffset)>;
 
     class Application
     {
@@ -18,11 +21,16 @@ namespace core
         std::unique_ptr<GLFWwindow, decltype(&glfwDestroyWindow)> mWindow{nullptr, glfwDestroyWindow};
 
         ResizeCallback mResizeCallback{nullptr};
-        KeyBoardCallback mKeyBoardCallback{nullptr};
+        KeyCallback mKeyCallback{nullptr};
+        MouseCallback mMouseCallback{nullptr};
+        CursorCallback mCursorCallback{nullptr};
+        ScrollCallback mScrollCallback{nullptr};
 
-        double mLastTime{0.0};
+        double mLastFrameTime{0.0}; // 用于计算dt
+        double mLastFPSTime{0.0};   // 用于计算fps
         uint32_t mFrameCount{0};
         double mFPS{0.0};
+        float mDeltaTime{0.0f};
 
     private:
         Application() = default;
@@ -44,10 +52,29 @@ namespace core
         /// @param scancode 物理按键码
         /// @param action 动作, 按下为GLFW_PRESS, 释放为GLFW_RELEASE, 重复为GLFW_REPEAT
         /// @param mods 修饰键, 组合键为GLFW_MOD_SHIFT, GLFW_MOD_CONTROL, GLFW_MOD_ALT, GLFW_MOD_SUPER
-        static void KeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
+        static void KeyBoardCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
+
+        /// @brief 鼠标监听回调函数
+        /// @param window 窗体指针
+        /// @param button 鼠标按键值, 例如GLFW_MOUSE_BUTTON_LEFT, GLFW_MOUSE_BUTTON_RIGHT
+        /// @param action 动作, 按下为GLFW_PRESS, 释放为GLFW_RELEASE
+        /// @param mods 修饰键, 组合键为GLFW_MOD_SHIFT, GLFW_MOD_CONTROL, GLFW_MOD_ALT, GLFW_MOD_SUPER
+        static void MouseButtonCallback(GLFWwindow *window, int button, int action, int mods);
+
+        /// @brief 鼠标位置监听回调函数
+        /// @param window 窗体指针
+        /// @param xpos 鼠标在窗口中的x坐标
+        /// @param ypos 鼠标在窗口中的y坐标
+        static void CursorPositionCallback(GLFWwindow *window, double xpos, double ypos);
+
+        /// @brief 鼠标滚轮监听回调函数
+        /// @param window 窗体指针
+        /// @param xoffset 鼠标滚轮水平偏移量
+        /// @param yoffset 鼠标滚轮垂直偏移量
+        static void MouseScrollCallback(GLFWwindow *window, double xoffset, double yoffset);
 
         /// @brief 更新FPS统计
-        void UpdateFPS();
+        void UpdateFPS(double currentTime);
 
     public:
         /// @brief 获取应用程序实例
@@ -70,9 +97,15 @@ namespace core
         // getters
         uint32_t GetWidth() const { return mWidth; }
         uint32_t GetHeight() const { return mHeight; }
+        float GetDeltaTime() const { return mDeltaTime; }
+        double GetFPS() const { return mFPS; }
+        void GetCursorPosition(double &xpos, double &ypos) const { glfwGetCursorPos(mWindow.get(), &xpos, &ypos); }
 
         // setters
         void SetResizeCallback(ResizeCallback callback) { mResizeCallback = std::move(callback); }
-        void SetKeyBoardCallback(KeyBoardCallback callback) { mKeyBoardCallback = std::move(callback); }
+        void SetKeyCallback(KeyCallback callback) { mKeyCallback = std::move(callback); }
+        void SetMouseCallback(MouseCallback callback) { mMouseCallback = std::move(callback); }
+        void SetCursorCallback(CursorCallback callback) { mCursorCallback = std::move(callback); }
+        void SetScrollCallback(ScrollCallback callback) { mScrollCallback = std::move(callback); }
     };
 }

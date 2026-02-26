@@ -12,26 +12,54 @@ namespace core
         }
     }
 
-    void Application::KeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
+    void Application::KeyBoardCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
     {
         Application *app = static_cast<Application *>(glfwGetWindowUserPointer(window));
-        if (app && app->mKeyBoardCallback)
+        if (app && app->mKeyCallback)
         {
-            app->mKeyBoardCallback(window, key, scancode, action, mods);
+            app->mKeyCallback(window, key, scancode, action, mods);
         }
     }
 
-    void Application::UpdateFPS()
+    void Application::MouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
     {
-        double currentTime = glfwGetTime();
-        mFrameCount++;
-        if (currentTime - mLastTime >= 2.0) // 每2秒更新一次FPS
+        Application *app = static_cast<Application *>(glfwGetWindowUserPointer(window));
+        if (app && app->mMouseCallback)
         {
-            mFPS = mFrameCount / (currentTime - mLastTime);
-            mFrameCount = 0;
-            mLastTime = currentTime;
+            app->mMouseCallback(window, button, action, mods);
+        }
+    }
 
-            // 更新窗口标题
+    void Application::CursorPositionCallback(GLFWwindow *window, double xpos, double ypos)
+    {
+        Application *app = static_cast<Application *>(glfwGetWindowUserPointer(window));
+        if (app && app->mCursorCallback)
+        {
+            app->mCursorCallback(window, xpos, ypos);
+        }
+    }
+
+    void Application::MouseScrollCallback(GLFWwindow *window, double xoffset, double yoffset)
+    {
+        Application *app = static_cast<Application *>(glfwGetWindowUserPointer(window));
+        if (app && app->mScrollCallback)
+        {
+            app->mScrollCallback(window, xoffset, yoffset);
+        }
+    }
+
+    void Application::UpdateFPS(double currentTime)
+    {
+        ++mFrameCount;
+
+        // 每秒更新一次标题, 平滑且开销小
+        const double elapsed = currentTime - mLastFPSTime;
+        if (elapsed >= 1.0)
+        {
+            mFPS = static_cast<double>(mFrameCount) / elapsed;
+            mFrameCount = 0;
+            mLastFPSTime = currentTime;
+
             std::string title = "GLRenderer    FPS: " + std::to_string(static_cast<int>(mFPS));
             glfwSetWindowTitle(mWindow.get(), title.c_str());
         }
@@ -74,7 +102,18 @@ namespace core
         glfwSetWindowUserPointer(mWindow.get(), this);
 
         glfwSetFramebufferSizeCallback(mWindow.get(), FramebufferSizeCallback); // 窗口大小监听
-        glfwSetKeyCallback(mWindow.get(), KeyCallback);                         // 键盘监听
+        glfwSetKeyCallback(mWindow.get(), KeyBoardCallback);                    // 键盘监听
+        glfwSetMouseButtonCallback(mWindow.get(), MouseButtonCallback);         // 鼠标点击监听
+        glfwSetCursorPosCallback(mWindow.get(), CursorPositionCallback);        // 鼠标位置监听
+        glfwSetScrollCallback(mWindow.get(), MouseScrollCallback);              // 鼠标滚轮监听
+
+        // 时间初始化
+        const double now = glfwGetTime();
+        mLastFrameTime = now;
+        mLastFPSTime = now;
+        mDeltaTime = 0.0f;
+        mFrameCount = 0;
+        mFPS = 0.0;
 
         GL_INFO("[Application] GLRenderer Init");
         return true;
@@ -82,17 +121,25 @@ namespace core
 
     bool Application::Update()
     {
-        if (glfwWindowShouldClose(mWindow.get()))
-        {
-            mWindow.reset(); // 在终止GLFW前销毁窗口
+        if (!mWindow)
             return false;
-        }
 
-        // FPS
-        UpdateFPS();
-        
+        const double now = glfwGetTime();
+        mDeltaTime = static_cast<float>(now - mLastFrameTime);
+        mLastFrameTime = now;
+
+        // 防止拖动窗口/断点后dt过大
+        if (mDeltaTime > 0.1f)
+            mDeltaTime = 0.1f;
+
         // 处理窗口输入事件
         glfwPollEvents();
+        // 更新FPS
+        UpdateFPS(now);
+
+        if (glfwWindowShouldClose(mWindow.get()))
+            return false;
+
         // 交换缓冲区
         glfwSwapBuffers(mWindow.get());
         return true;
@@ -100,6 +147,7 @@ namespace core
 
     void Application::Destroy()
     {
+        mWindow.reset();
         glfwTerminate();
         GL_INFO("[Application] GLRenderer Shutdown");
     }

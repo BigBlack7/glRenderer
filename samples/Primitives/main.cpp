@@ -1,11 +1,13 @@
 ﻿// core
-#include <utils/logger.hpp>
 #include <application/application.hpp>
+#include <camera/camera.hpp>
+#include <camera/cameraController.hpp>
 #include <shader/shader.hpp>
 #include <texture/texture.hpp>
-// external
-#include <glm/gtc/matrix_transform.hpp>
+#include <utils/logger.hpp>
 
+std::shared_ptr<core::Camera> camera = nullptr;
+std::unique_ptr<core::CameraController> controller = nullptr;
 std::unique_ptr<core::Shader> shader = nullptr;
 std::unique_ptr<core::Texture> grass = nullptr;
 std::unique_ptr<core::Texture> land = nullptr;
@@ -86,22 +88,6 @@ void Prepare(GLuint &vao)
     noise = std::make_unique<core::Texture>("mix/noise.jpg", 2);
 }
 
-glm::mat4 MVP()
-{
-    glm::mat4 M(1.f);
-    // M = glm::translate(M, glm::vec3(0.5f, -0.5f, 0.f));
-    // M = glm::rotate(M, glm::radians((float)glfwGetTime() * 50.f), glm::vec3(0.f, 0.f, 1.f));
-    // M = glm::scale(M, glm::vec3(0.5f));
-    glm::mat4 V(1.f);
-    V = glm::lookAt(glm::vec3(0.f, 0.f, 5.f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 1.f, 0.f));
-
-    glm::mat4 P(1.f);
-    // P = glm::ortho(-2.f, 2.f, -2.f, 2.f, 2.f, -2.f); // 将视距内的坐标映射到NDC坐标范围内
-    P = glm::perspective(glm::radians(45.f), 196.f / 108.f, 0.1f, 1000.f);
-
-    return P * V * M;
-}
-
 void render(GLuint vao)
 {
     // render阶段
@@ -112,7 +98,7 @@ void render(GLuint vao)
     shader->SetInt("grassSampler", 0);
     shader->SetInt("landSampler", 1);
     shader->SetInt("noiseSampler", 2);
-    shader->SetMat4("transform", MVP());
+    shader->SetMat4("transform", camera->GetProjectionMatrix() * camera->GetViewMatrix());
 
     glBindVertexArray(vao);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_BYTE, (void *)0);
@@ -131,14 +117,35 @@ int main()
     if (!App.Init(WIDTH, HEIGHT))
         return -1;
 
+    camera = std::make_shared<core::Camera>(core::Camera::CreatePerspective(45.f, static_cast<float>(WIDTH) / static_cast<float>(HEIGHT), 0.1f, 100.f));
+    // camera = std::make_shared<core::Camera>(core::Camera::CreateOrthographic(-1.f, 1.f, 1.f, -1.f, 0.1f, 100.f));
+    controller = std::make_unique<core::CameraController>();
+    controller->SetCamera(camera);
+
     // 注册各类回调函数
     App.SetResizeCallback([](uint32_t width, uint32_t height) { // 窗口大小监听
-        GL_TRACE("OnResize: width={}, height={}", width, height);
         glViewport(0, 0, width, height);
+        if (height != 0)
+        {
+            camera->SetAspect(static_cast<float>(width) / static_cast<float>(height));
+        }
     });
 
-    App.SetKeyBoardCallback([](GLFWwindow *window, int key, int scancode, int action, int mods) { // 键盘监听
-        GL_TRACE("Click {}", key);
+    App.SetKeyCallback([](GLFWwindow *window, int key, int scancode, int action, int mods) { // 键盘监听
+        controller->OnKey(window, key, scancode, action, mods);
+    });
+
+    App.SetMouseCallback([&App](GLFWwindow *window, int button, int action, int mods) { // 鼠标点击监听
+        // TODO 鼠标点击事件
+        GL_TRACE("Mouse Click");
+    });
+
+    App.SetCursorCallback([](GLFWwindow *window, double xpos, double ypos) { // 鼠标位置监听
+        controller->OnCursorPos(window, xpos, ypos);
+    });
+
+    App.SetScrollCallback([](GLFWwindow *window, double xoffset, double yoffset) { // 鼠标滚轮监听
+        controller->OnScroll(window, xoffset, yoffset);
     });
 
     glViewport(0, 0, WIDTH, HEIGHT);
@@ -149,6 +156,8 @@ int main()
 
     while (App.Update())
     {
+        controller->Update(App.GetDeltaTime());
+
         render(vao);
     }
 
@@ -157,3 +166,7 @@ int main()
     core::Logger::Shutdown();
     return 0;
 }
+
+/*
+（重要前提：我目前在实现一个opengl的个人渲染器用来作为简历找工作的项目，不需要像商业级引擎一样复杂，只需要项目结构清晰明了，实现高效且优雅，符合工程实践。）
+*/

@@ -1,5 +1,6 @@
 ﻿# GLRenderer
 
+- Refer to LearnOpenGL
 - Build it by MSVC
 
 # NameFormat
@@ -14,4 +15,18 @@
 
 # Implemented
 
+    GLFW Window
+    Roaming Camera
+    Shader
+    Texture
+
 # Todo
+
+    Lights
+    Shadow Mapping
+    Disney PBR
+    IBL
+    Geometry
+    Post Process
+    Deferred Rendering Pipeline
+    IMGUI Editor
