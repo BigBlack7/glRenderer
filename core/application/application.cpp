@@ -65,7 +65,7 @@ namespace core
         }
     }
 
-    Application &Application::GetInstance()
+    Application &Application::GetApp()
     {
         // Meyers' Singleton, (cpp11)静态局部变量初始化是线程安全的
         static Application instance;

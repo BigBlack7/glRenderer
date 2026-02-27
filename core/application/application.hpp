@@ -79,7 +79,7 @@ namespace core
     public:
         /// @brief 获取应用程序实例
         /// @return 应用程序实例指针
-        static Application &GetInstance();
+        static Application &GetApp();
 
         /// @brief 初始化应用程序
         /// @param width 窗口宽度
