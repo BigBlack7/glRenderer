@@ -78,6 +78,8 @@ namespace core
         void SetVec3(std::string_view name, const float *value) const;
         void SetVec3(std::string_view name, const glm::vec3 &value) const;
         void SetInt(std::string_view name, int value) const;
+        void SetUInt(std::string_view name, uint32_t value) const;
         void SetMat4(std::string_view name, const glm::mat4 &value) const;
+        void SetMat3(std::string_view name, const glm::mat3 &value) const;
     };
 }

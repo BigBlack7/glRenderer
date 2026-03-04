@@ -85,7 +85,7 @@ namespace core
         mWindow.reset(glfwCreateWindow(mWidth, mHeight, "GLRenderer", nullptr, nullptr));
         if (mWindow == nullptr)
         {
-            GL_ERROR("[Application] Failed To Create GLFW Window");
+            GL_CRITICAL("[Application] Failed To Create GLFW Window");
             return false;
         }
         // 创建glfw上下文
@@ -94,7 +94,7 @@ namespace core
         // 加载OpenGL函数指针
         if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
         {
-            GL_ERROR("[Application] Failed To Initialize GLAD");
+            GL_CRITICAL("[Application] Failed To Initialize GLAD");
             return false;
         }
 

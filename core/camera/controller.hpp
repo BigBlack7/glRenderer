@@ -60,13 +60,13 @@ namespace core
         /// @param scancode 扫描码
         /// @param action 操作类型
         /// @param mods 修饰键状态
-        void OnKey(GLFWwindow *window, int key, int scancode, int action, int mods);
+        void OnKey(GLFWwindow *window, int key, [[maybe_unused]] int scancode, int action, [[maybe_unused]] int mods);
 
         /// @brief 处理鼠标位置移动事件
         /// @param window 窗口指针
         /// @param xpos 鼠标X位置
         /// @param ypos 鼠标Y位置
-        void OnCursorPos(GLFWwindow *window, double xpos, double ypos);
+        void OnCursorPos([[maybe_unused]] GLFWwindow *window, double xpos, double ypos);
 
         /// @brief 处理鼠标按钮事件
         /// @param window 窗口指针

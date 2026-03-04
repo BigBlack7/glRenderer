@@ -17,7 +17,8 @@ namespace core
         Texture(const std::string &path, uint32_t unit);
         ~Texture();
 
-        void Bind();
+        void Bind() const;
+        void Bind(uint32_t unit) const;
 
         /* getter */
         uint32_t GetWidth() const { return mWidth; }

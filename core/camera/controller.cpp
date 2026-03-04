@@ -1,4 +1,4 @@
-﻿#include "cameraController.hpp"
+﻿#include "controller.hpp"
 #include "utils/logger.hpp"
 #include <GLFW/glfw3.h>
 #include <cmath>
@@ -108,12 +108,8 @@ namespace core
         }
     }
 
-    void CameraController::OnKey(GLFWwindow *window, int key, int scancode, int action, int mods)
+    void CameraController::OnKey(GLFWwindow *window, int key, [[maybe_unused]] int scancode, int action, [[maybe_unused]] int mods)
     {
-        // 避免编译器警告
-        (void)scancode;
-        (void)mods;
-
         // ESC: 请求关闭窗口
         if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         {
@@ -139,11 +135,8 @@ namespace core
         }
     }
 
-    void CameraController::OnCursorPos(GLFWwindow *window, double xpos, double ypos)
+    void CameraController::OnCursorPos([[maybe_unused]] GLFWwindow *window, double xpos, double ypos)
     {
-        // 避免警告
-        (void)window;
-
         // 非控制模式或未绑定相机则忽略鼠标移动
         if (!mControlEnabled || !mCamera)
             return;
@@ -175,7 +168,11 @@ namespace core
 
     void CameraController::OnMouseButton(GLFWwindow *window, int button, int action, int mods)
     {
-        // TODO: 处理鼠标点击事件, 鼠标点选, 射线拾取
+        // TODO: 处理鼠标点击事件, 鼠标点选, 射线拾取(非漫游模式下)
+        if (!mControlEnabled)
+        {
+            GL_TRACE("Mouse Button Click");
+        }
     }
 
     void CameraController::OnScroll(GLFWwindow *window, double xoffset, double yoffset)

@@ -1,0 +1,96 @@
+﻿#pragma once
+#include <glm/glm.hpp>
+#include <array>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+
+namespace core
+{
+    class Shader;
+    class Texture;
+
+    enum class TextureSlot : uint8_t
+    {
+        Albedo = 0,
+        Normal,
+        MetallicRoughness,
+        AO,
+        Emissive,
+        OpacityMask,
+        Count // 纹理槽数量
+    };
+
+    class Material final
+    {
+    private:
+        static constexpr size_t TextureSlotCount = static_cast<size_t>(TextureSlot::Count);
+        static_assert(TextureSlotCount <= 32, "TextureSlotCount exceeds 32-bit feature flag capacity.");
+
+        std::shared_ptr<Shader> mShader{};
+        std::array<std::shared_ptr<Texture>, TextureSlotCount> mTextures{};
+        std::array<std::string, TextureSlotCount> mTextureUniformNames{
+            "uAlbedoSampler",        // Albedo
+            "uNormalSampler",        // Normal
+            "uMetallicRoughSampler", // MetallicRoughness
+            "uAOSampler",            // AO
+            "uEmissiveSampler",      // Emissive
+            "uOpacitySampler"        // OpacityMask
+        };
+
+        // 材质特性位掩码
+        uint32_t mFeatureFlags{0};
+
+        std::unordered_map<std::string, float> mFloatParams{};
+        std::unordered_map<std::string, int> mIntParams{};
+        std::unordered_map<std::string, uint32_t> mUIntParams{};
+        std::unordered_map<std::string, glm::vec3> mVec3Params{};
+
+        // 运行期日志记录避免刷屏
+        mutable bool mWarnedNoShader{false};          // 记录是否已经警告过缺失着色器
+        mutable uint32_t mWarnedEmptySamplerMask{0u}; // 记录是否已经警告过缺失贴图槽位
+
+    private:
+        static constexpr size_t ToIndex(TextureSlot slot) { return static_cast<size_t>(slot); }
+
+        /// @brief 根据当前贴图槽重建位掩码, 数据变更后保持一致性
+        void RebuildFeatureFlags();
+
+    public:
+        Material() = default;
+        explicit Material(std::shared_ptr<Shader> shader);
+
+        /// @brief 设置着色器
+        /// @param shader 着色器对象的shared_ptr, 允许外部共享和复用着色器资源
+        void SetShader(std::shared_ptr<Shader> shader);
+        const std::shared_ptr<Shader> &GetShader() const { return mShader; }
+
+        /// @brief 设置纹理, 通过TextureSlot指定槽位, 允许外部共享和复用纹理资源
+        /// @param slot 纹理槽位
+        /// @param texture 纹理对象
+        void SetTexture(TextureSlot slot, std::shared_ptr<Texture> texture);
+
+        /// @brief 获取纹理
+        /// @param slot 纹理槽位
+        /// @return 对应槽位的纹理对象, 如果未设置则返回nullptr
+        std::shared_ptr<Texture> GetTexture(TextureSlot slot) const;
+
+        /// @brief 支持与shader命名不一致时手动映射
+        /// @param slot 纹理槽位
+        /// @param uniformName 纹理采样器在shader中的uniform变量名
+        void SetTextureUniformName(TextureSlot slot, std::string uniformName);
+
+        /* setter */
+        void SetFloat(std::string_view name, float value);
+        void SetInt(std::string_view name, int value);
+        void SetUInt(std::string_view name, uint32_t value);
+        void SetVec3(std::string_view name, const glm::vec3 &value);
+
+        void Bind() const;
+        void Unbind() const;
+
+        uint32_t GetFeatureFlags() const { return mFeatureFlags; }
+    };
+}
