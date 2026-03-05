@@ -6,6 +6,7 @@
 #include <geometry/mesh.hpp>
 #include <geometry/transform.hpp>
 #include <material/material.hpp>
+#include <light/light.hpp>
 #include <shader/shader.hpp>
 #include <texture/texture.hpp>
 #include <utils/logger.hpp>
@@ -15,14 +16,94 @@ std::unique_ptr<core::CameraController> controller = nullptr;
 std::shared_ptr<core::Entity> earth = nullptr;
 std::shared_ptr<core::Entity> moon = nullptr;
 std::shared_ptr<core::Entity> sun = nullptr;
+std::shared_ptr<core::Shader> phongShader = nullptr;
+
+constexpr uint32_t MaxDirectionalLights = 4u;
+std::array<core::DirectionalLight, MaxDirectionalLights> directionalLights{};
+uint32_t directionalLightCount = 0u;
+
+static constexpr std::array<const char *, MaxDirectionalLights> DirDirectionUniforms{
+    "uDirectionalLights[0].direction",
+    "uDirectionalLights[1].direction",
+    "uDirectionalLights[2].direction",
+    "uDirectionalLights[3].direction"};
+
+static constexpr std::array<const char *, MaxDirectionalLights> DirColorUniforms{
+    "uDirectionalLights[0].color",
+    "uDirectionalLights[1].color",
+    "uDirectionalLights[2].color",
+    "uDirectionalLights[3].color"};
+
+static constexpr std::array<const char *, MaxDirectionalLights> DirIntensityUniforms{
+    "uDirectionalLights[0].intensity",
+    "uDirectionalLights[1].intensity",
+    "uDirectionalLights[2].intensity",
+    "uDirectionalLights[3].intensity"};
+
+void BuildDirectionalLights()
+{
+    directionalLightCount = 0u;
+
+    // 主光 - 红色, 从右上方照射
+    core::DirectionalLight mainLight;
+    mainLight.SetDirection(glm::vec3(-1.0f, -1.0f, 0.5f));
+    mainLight.SetColor(glm::vec3(1.0f, 0.2f, 0.2f));
+    mainLight.SetIntensity(0.8f);
+    directionalLights[directionalLightCount++] = mainLight;
+
+    // 补光 - 绿色, 从左前方照射
+    core::DirectionalLight fillLight;
+    fillLight.SetDirection(glm::vec3(0.8f, -0.6f, 0.5f));
+    fillLight.SetColor(glm::vec3(0.2f, 1.0f, 0.2f));
+    fillLight.SetIntensity(0.6f);
+    directionalLights[directionalLightCount++] = fillLight;
+
+    // 背光 - 蓝色, 从后方照射
+    core::DirectionalLight backLight;
+    backLight.SetDirection(glm::vec3(0.0f, -0.5f, -1.0f));
+    backLight.SetColor(glm::vec3(0.2f, 0.2f, 1.0f));
+    backLight.SetIntensity(0.4f);
+    directionalLights[directionalLightCount++] = backLight;
+
+    // 顶光 - 黄色, 从正上方照射
+    core::DirectionalLight topLight;
+    topLight.SetDirection(glm::vec3(0.0f, -1.0f, 0.0f));
+    topLight.SetColor(glm::vec3(1.0f, 1.0f, 0.2f));
+    topLight.SetIntensity(0.3f);
+    directionalLights[directionalLightCount++] = topLight;
+}
+
+void UploadDirectionalLights()
+{
+    if (!phongShader)
+        return;
+
+    phongShader->Begin();
+
+    uint32_t uploadCount = 0u;
+    for (uint32_t i = 0; i < directionalLightCount && uploadCount < MaxDirectionalLights; ++i)
+    {
+        const auto &light = directionalLights[i];
+        if (!light.IsEnabled())
+            continue;
+
+        phongShader->SetVec3(DirDirectionUniforms[uploadCount], light.GetDirection());
+        phongShader->SetVec3(DirColorUniforms[uploadCount], light.GetColor());
+        phongShader->SetFloat(DirIntensityUniforms[uploadCount], light.GetIntensity());
+        ++uploadCount;
+    }
+
+    phongShader->SetInt("uDirectionalLightCount", static_cast<int>(uploadCount));
+    phongShader->End();
+}
 
 void Prepare()
 {
     /* shader处理阶段 */
-    auto shader = std::make_shared<core::Shader>("phong/phong.vert", "phong/phong.frag");
-    auto earthMaterial = std::make_shared<core::Material>(shader);
-    auto moonMaterial = std::make_shared<core::Material>(shader);
-    auto sunMaterial = std::make_shared<core::Material>(shader);
+    phongShader = std::make_shared<core::Shader>("phong/phong.vert", "phong/phong.frag");
+    auto earthMaterial = std::make_shared<core::Material>(phongShader);
+    auto moonMaterial = std::make_shared<core::Material>(phongShader);
+    auto sunMaterial = std::make_shared<core::Material>(phongShader);
 
     /* 几何处理阶段 */
     auto sphere = core::Mesh::CreateSphere(1.f);
@@ -41,7 +122,7 @@ void Prepare()
     auto sunTex = std::make_shared<core::Texture>("sun.jpg", 0);
     sunMaterial->SetTexture(core::TextureSlot::Albedo, sunTex);
     sunMaterial->SetVec3("uDefaultColor", glm::vec3(0.67f, 0.21f, 0.45f));
-    sunMaterial->SetFloat("uShininess", 8.f);
+    sunMaterial->SetFloat("uShininess", 16.f);
 
     /* 实体构造阶段 */
     earth = std::make_shared<core::Entity>(0u, "Earth");
@@ -59,6 +140,10 @@ void Prepare()
     sun->SetMaterial(sunMaterial);
     sun->GetTransform().SetPosition(glm::vec3(-6.f, 1.f, 0.f));
     sun->GetTransform().SetScale(glm::vec3(2.5f));
+
+    /* 光源设置阶段 */
+    BuildDirectionalLights();
+    UploadDirectionalLights();
 
     /* 渲染状态设置阶段 */
     glEnable(GL_DEPTH_TEST);
@@ -121,6 +206,7 @@ int main()
     glClearColor(0.68f, 0.85f, 0.90f, 1.f);
 
     Prepare();
+
     while (App.Update())
     {
         controller->Update(App.GetDeltaTime());
@@ -133,3 +219,6 @@ int main()
     core::Logger::Shutdown();
     return 0;
 }
+/*
+（重要前提：我目前在实现一个opengl的个人渲染器用来作为简历找工作的项目，不需要像商业级引擎一样复杂，只需要项目结构清晰明了，实现高效且优雅，符合工程实践。）
+*/

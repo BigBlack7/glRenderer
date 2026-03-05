@@ -45,7 +45,7 @@
   - Holds geometry data and GPU resources (VAO/VBO/EBO)
   - Primitive factory functions can generate cube/sphere/plane for testing
 - ✅ `Transform`
-  - Holds position, rotation, scale
+  - Holds position, rotation, scale(only for itself)
 - ✅ `Material`
   - Manages shader/texture/uniform concepts
 - ⬜ `Light`
@@ -59,6 +59,7 @@
   - Holds a container of `Entity`
 - ⬜ `Scene`
   - Holds `Entity` list, `Model` list, `Light` list
+  - Maintain parent-child relationship and logic
 - ⬜ `Renderer`
   - Stateless service entry
   - Interface: `Render(const Scene&, const Camera&)`

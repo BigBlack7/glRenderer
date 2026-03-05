@@ -1,4 +1,5 @@
 #version 460 core
+#extension GL_ARB_shading_language_include : require
 out vec4 oPixelColor;
 
 // in
@@ -17,6 +18,9 @@ uniform float uShininess;
 
 const uint MAT_HAS_ALBEDO_TEX = (1u << 0u);
 
+// light
+#include "../common/light.glsl"
+
 void main()
 {
     // common
@@ -24,20 +28,31 @@ void main()
     vec3 V = normalize(uViewPos - oFragPos);
     vec3 object_color = ((uMaterialFlags & MAT_HAS_ALBEDO_TEX) != 0u) ? texture(uAlbedoSampler, oUV).rgb : uDefaultColor;
     
-    // directional light
-    vec3 Ld = normalize(vec3(-1.0, - 1.0, - 1.0)); // 光线方向（世界空间）
-    vec3 L = normalize(-Ld); // 片元指向光源方向
-    vec3 light_color = vec3(0.9255, 0.902, 0.8824);
+    vec3 diffuse_color = vec3(0.0);
+    vec3 specular_color = vec3(0.0);
     
-    // phong shading model
-    float diff = max(dot(N, L), 0.0);
-    vec3 diffuse_color = light_color * object_color * diff;
+    int light_count = clamp(uDirectionalLightCount, 0, MAX_DIRECTIONAL_LIGHTS);
     
-    vec3 R = reflect(-L, N);
-    float spec = pow(max(dot(R, V), 0.0), uShininess);
-    vec3 specular_color = light_color * spec * step(0.0, diff);
+    for(int i = 0; i < light_count; ++ i)
+    {
+        DirectionalLight light = uDirectionalLights[i];
+        
+        if (light.intensity <= 0.0)
+        continue;
+        
+        vec3 Ld = normalize(light.direction); // 光线方向(世界空间)
+        vec3 L = normalize(-Ld);
+        vec3 radiance = light.color * light.intensity;
+        
+        float diffuse = max(dot(N, L), 0.0);
+        diffuse_color += radiance * diffuse * object_color;
+        
+        vec3 R = reflect(-L, N);
+        float specular = pow(max(dot(V, R), 0.0), uShininess);
+        specular_color += radiance * specular * step(0.0, diffuse);
+    }
     
-    vec3 ambient_color = vec3(0.1) * object_color;
+    vec3 ambient_color = vec3(0.08) * object_color;
     
     oPixelColor = vec4(diffuse_color + specular_color + ambient_color, 1.0);
 }
