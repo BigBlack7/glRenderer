@@ -73,7 +73,6 @@ namespace core
             GL_CRITICAL("[Mesh] SetData Failed: Vertices Array Is Empty");
             return;
         }
-        
 
         mVertexCount = static_cast<uint32_t>(vertices.size());
         mIndexCount = static_cast<uint32_t>(indices.size());
@@ -83,24 +82,38 @@ namespace core
             glGenVertexArrays(1, &mVAO);
         if (mVBO == 0)
             glGenBuffers(1, &mVBO);
-        if (mEBO == 0)
-            glGenBuffers(1, &mEBO);
 
         glBindVertexArray(mVAO);
 
         glBindBuffer(GL_ARRAY_BUFFER, mVBO);
         glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(vertices.size() * sizeof(MeshVertex)), vertices.data(), GL_STATIC_DRAW);
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mEBO);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(indices.size() * sizeof(uint32_t)), indices.data(), GL_STATIC_DRAW);
+        if (!indices.empty())
+        {
+            if (mEBO == 0)
+                glGenBuffers(1, &mEBO);
+
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mEBO);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(indices.size() * sizeof(uint32_t)), indices.data(), GL_STATIC_DRAW);
+        }
+        else
+        {
+            // 非索引网格: 解绑并释放旧EBO
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+            if (mEBO != 0)
+            {
+                glDeleteBuffers(1, &mEBO);
+                mEBO = 0;
+            }
+        }
 
         // location 0 -> position
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), reinterpret_cast<void *>(offsetof(MeshVertex, __position__)));
 
-        // location 1 -> texCoord
+        // location 1 -> uv
         glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), reinterpret_cast<void *>(offsetof(MeshVertex, __texCoord__)));
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), reinterpret_cast<void *>(offsetof(MeshVertex, __uv__)));
 
         // location 2 -> normal
         glEnableVertexAttribArray(2);
@@ -136,7 +149,7 @@ namespace core
         glBindVertexArray(0);
     }
 
-    std::unique_ptr<Mesh> Mesh::CreatePlane(float size)
+    std::shared_ptr<Mesh> Mesh::CreatePlane(float size)
     {
         const float h = size * 0.5f;
 
@@ -151,12 +164,12 @@ namespace core
             0, 1, 2,
             2, 3, 0};
 
-        auto mesh = std::make_unique<Mesh>();
+        auto mesh = std::make_shared<Mesh>();
         mesh->SetData(vertices, indices);
         return mesh;
     }
 
-    std::unique_ptr<Mesh> Mesh::CreateCube(float size)
+    std::shared_ptr<Mesh> Mesh::CreateCube(float size)
     {
         const float h = size * 0.5f;
 
@@ -206,12 +219,12 @@ namespace core
             16, 17, 18, 18, 19, 16,
             20, 21, 22, 22, 23, 20};
 
-        auto mesh = std::make_unique<Mesh>();
+        auto mesh = std::make_shared<Mesh>();
         mesh->SetData(vertices, indices);
         return mesh;
     }
 
-    std::unique_ptr<Mesh> Mesh::CreateSphere(float radius, uint32_t latitude, uint32_t longitude)
+    std::shared_ptr<Mesh> Mesh::CreateSphere(float radius, uint32_t latitude, uint32_t longitude)
     {
         latitude = std::max<uint32_t>(latitude, 3u);
         longitude = std::max<uint32_t>(longitude, 3u);
@@ -261,7 +274,7 @@ namespace core
             }
         }
 
-        auto mesh = std::make_unique<Mesh>();
+        auto mesh = std::make_shared<Mesh>();
         mesh->SetData(vertices, indices);
         return mesh;
     }

@@ -12,7 +12,7 @@ namespace core
     class Camera
     {
     private:
-        glm::vec3 mPosition{0.f, 0.f, 5.f}; // 相机位置
+        glm::vec3 mPosition{0.f, 0.f, 7.f}; // 相机位置
         glm::vec3 mUp{0.f, 1.f, 0.f};       // 相机相机局部上方向
         glm::vec3 mRight{1.f, 0.f, 0.f};    // 相机局部右方向
 

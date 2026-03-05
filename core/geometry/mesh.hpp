@@ -11,7 +11,7 @@ namespace core
     struct MeshVertex
     {
         glm::vec3 __position__{0.f, 0.f, 0.f};
-        glm::vec2 __texCoord__{0.f, 0.f}; // uv坐标
+        glm::vec2 __uv__{0.f, 0.f}; // uv坐标
         glm::vec3 __normal__{0.f, 1.f, 0.f};
     };
 
@@ -70,8 +70,8 @@ namespace core
         GLuint GetVAO() const { return mVAO; }
 
         // Primitive factories
-        static std::unique_ptr<Mesh> CreatePlane(float size = 1.f);
-        static std::unique_ptr<Mesh> CreateCube(float size = 1.f);
-        static std::unique_ptr<Mesh> CreateSphere(float radius = 1.f, uint32_t latitude = 64, uint32_t longitude = 64);
+        static std::shared_ptr<Mesh> CreatePlane(float size = 1.f);
+        static std::shared_ptr<Mesh> CreateCube(float size = 1.f);
+        static std::shared_ptr<Mesh> CreateSphere(float radius = 1.f, uint32_t latitude = 64, uint32_t longitude = 64);
     };
 }

@@ -2,6 +2,7 @@
 #include <application/application.hpp>
 #include <camera/camera.hpp>
 #include <camera/controller.hpp>
+#include <entity/entity.hpp>
 #include <geometry/mesh.hpp>
 #include <geometry/transform.hpp>
 #include <material/material.hpp>
@@ -11,24 +12,53 @@
 
 std::shared_ptr<core::Camera> camera = nullptr;
 std::unique_ptr<core::CameraController> controller = nullptr;
-std::shared_ptr<core::Material> material = nullptr;
-std::unique_ptr<core::Mesh> geometry = nullptr;
-core::Transform modelTrans{};
+std::shared_ptr<core::Entity> earth = nullptr;
+std::shared_ptr<core::Entity> moon = nullptr;
+std::shared_ptr<core::Entity> sun = nullptr;
 
 void Prepare()
 {
     /* shader处理阶段 */
     auto shader = std::make_shared<core::Shader>("phong/phong.vert", "phong/phong.frag");
-    material = std::make_shared<core::Material>(shader);
+    auto earthMaterial = std::make_shared<core::Material>(shader);
+    auto moonMaterial = std::make_shared<core::Material>(shader);
+    auto sunMaterial = std::make_shared<core::Material>(shader);
 
     /* 几何处理阶段 */
-    geometry = core::Mesh::CreateSphere(1.f);
+    auto sphere = core::Mesh::CreateSphere(1.f);
 
     /* 材质处理阶段 */
-    auto earthTex = std::make_shared<core::Texture>("earth.png", 0);
-    material->SetTexture(core::TextureSlot::Albedo, earthTex);
-    material->SetVec3("uDefaultColor", glm::vec3(1.f, 1.f, 1.f));
-    material->SetFloat("uShininess", 64.f);
+    auto earthTex = std::make_shared<core::Texture>("earth.jpg", 0);
+    earthMaterial->SetTexture(core::TextureSlot::Albedo, earthTex);
+    earthMaterial->SetVec3("uDefaultColor", glm::vec3(1.f, 1.f, 1.f));
+    earthMaterial->SetFloat("uShininess", 64.f);
+
+    auto moonTex = std::make_shared<core::Texture>("moon.jpg", 0);
+    moonMaterial->SetTexture(core::TextureSlot::Albedo, moonTex);
+    moonMaterial->SetVec3("uDefaultColor", glm::vec3(0.23f, 0.43f, 0.82f));
+    moonMaterial->SetFloat("uShininess", 32.f);
+
+    auto sunTex = std::make_shared<core::Texture>("sun.jpg", 0);
+    sunMaterial->SetTexture(core::TextureSlot::Albedo, sunTex);
+    sunMaterial->SetVec3("uDefaultColor", glm::vec3(0.67f, 0.21f, 0.45f));
+    sunMaterial->SetFloat("uShininess", 8.f);
+
+    /* 实体构造阶段 */
+    earth = std::make_shared<core::Entity>(0u, "Earth");
+    earth->SetMesh(sphere);
+    earth->SetMaterial(earthMaterial);
+
+    moon = std::make_shared<core::Entity>(1u, "Moon");
+    moon->SetMesh(sphere);
+    moon->SetMaterial(moonMaterial);
+    moon->GetTransform().SetPosition(glm::vec3(2.f, 0.f, 0.f));
+    moon->GetTransform().SetScale(glm::vec3(0.27f));
+
+    sun = std::make_shared<core::Entity>(2u, "Sun");
+    sun->SetMesh(sphere);
+    sun->SetMaterial(sunMaterial);
+    sun->GetTransform().SetPosition(glm::vec3(-6.f, 1.f, 0.f));
+    sun->GetTransform().SetScale(glm::vec3(2.5f));
 
     /* 渲染状态设置阶段 */
     glEnable(GL_DEPTH_TEST);
@@ -39,19 +69,14 @@ void render()
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    material->Bind();
-    const auto &shader = material->GetShader();
+    earth->GetTransform().SetEulerXyzRad(glm::vec3(0.f, static_cast<float>(glfwGetTime()) * 0.5f, 0.f));
+    earth->Draw(*camera);
 
-    shader->SetMat4("uP", camera->GetProjectionMatrix());
-    shader->SetMat4("uV", camera->GetViewMatrix());
-    modelTrans.SetEulerXyzRad(glm::vec3(0.f, static_cast<float>(glfwGetTime()) * 0.5f, 0.f));
-    shader->SetMat4("uM", modelTrans.GetModelMatrix());
-    shader->SetMat3("uN", modelTrans.GetNormalMatrix());
-    shader->SetVec3("uViewPos", camera->GetPosition());
+    moon->GetTransform().SetEulerXyzRad(glm::vec3(0.f, static_cast<float>(glfwGetTime()) * 0.5f, 0.f));
+    moon->Draw(*camera);
 
-    geometry->Draw();
-
-    material->Unbind();
+    sun->GetTransform().SetEulerXyzRad(glm::vec3(0.f, static_cast<float>(glfwGetTime()) * 0.5f, 0.f));
+    sun->Draw(*camera);
 }
 
 int main()
@@ -73,9 +98,7 @@ int main()
     App.SetResizeCallback([](uint32_t width, uint32_t height) { // 窗口大小监听
         glViewport(0, 0, width, height);
         if (height != 0)
-        {
             camera->SetAspect(static_cast<float>(width) / static_cast<float>(height));
-        }
     });
 
     App.SetKeyCallback([](GLFWwindow *window, int key, int scancode, int action, int mods) { // 键盘监听
@@ -83,7 +106,6 @@ int main()
     });
 
     App.SetMouseCallback([](GLFWwindow *window, int button, int action, int mods) { // 鼠标点击监听
-        // TODO 鼠标点击事件
         controller->OnMouseButton(window, button, action, mods);
     });
 

@@ -57,8 +57,19 @@ namespace core
 
         RebuildLocalMatrix();
 
+        const glm::mat3 model3(mLocalMatrix);
+        const float det = glm::determinant(model3);
+
         // 法线矩阵 = inverse-transpose(mat3(model))
-        mNormalMatrix = glm::transpose(glm::inverse(glm::mat3(mLocalMatrix)));
+        // 奇异矩阵(如某轴scale=0)不可逆: 回退为仅旋转法线变换
+        if (glm::abs(det) <= detail::Epsilon)
+        {
+            mNormalMatrix = glm::mat3_cast(glm::normalize(mRotation));
+        }
+        else
+        {
+            mNormalMatrix = glm::transpose(glm::inverse(model3));
+        }
         mNormalDirty = false;
     }
 

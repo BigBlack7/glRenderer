@@ -1,5 +1,5 @@
 ﻿#include "application.hpp"
-#include <utils/logger.hpp>
+#include "utils/logger.hpp"
 
 namespace core
 {
@@ -107,7 +107,7 @@ namespace core
         glfwSetCursorPosCallback(mWindow.get(), CursorPositionCallback);        // 鼠标位置监听
         glfwSetScrollCallback(mWindow.get(), MouseScrollCallback);              // 鼠标滚轮监听
 
-        // 时间初始化
+        // 时间初始化， 避免第一帧异常
         const double now = glfwGetTime();
         mLastFrameTime = now;
         mLastFPSTime = now;

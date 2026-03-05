@@ -1,6 +1,5 @@
 ﻿# GLRenderer
 
-- Refer to LearnOpenGL
 - Build it by MSVC
 
 # NameFormat
@@ -45,15 +44,15 @@
 - ✅ `Mesh`
   - Holds geometry data and GPU resources (VAO/VBO/EBO)
   - Primitive factory functions can generate cube/sphere/plane for testing
-- ⬜ `Transform`
+- ✅ `Transform`
   - Holds position, rotation, scale
-- ⬜ `Material`
+- ✅ `Material`
   - Manages shader/texture/uniform concepts
 - ⬜ `Light`
   - Directional Light
   - Point Light
   - Spot Light
-- ⬜ `Entity`
+- ✅ `Entity`
   - A renderable unit: binds `Mesh + Material + Transform`
   - one parent(index), multiple children(index vector)
 - ⬜ `Model`
