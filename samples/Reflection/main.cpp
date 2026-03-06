@@ -2,10 +2,11 @@
 #include <application/application.hpp>
 #include <camera/camera.hpp>
 #include <camera/controller.hpp>
-#include <entity/entity.hpp>
 #include <geometry/mesh.hpp>
 #include <geometry/transform.hpp>
 #include <material/material.hpp>
+#include <scene/entity.hpp>
+#include <scene/scene.hpp>
 #include <light/light.hpp>
 #include <shader/shader.hpp>
 #include <texture/texture.hpp>
@@ -13,10 +14,12 @@
 
 std::shared_ptr<core::Camera> camera = nullptr;
 std::unique_ptr<core::CameraController> controller = nullptr;
-std::shared_ptr<core::Entity> earth = nullptr;
-std::shared_ptr<core::Entity> moon = nullptr;
-std::shared_ptr<core::Entity> sun = nullptr;
 std::shared_ptr<core::Shader> phongShader = nullptr;
+
+std::unique_ptr<core::Scene> scene = nullptr;
+core::EntityID earthID = core::InvalidEntityID;
+core::EntityID moonID = core::InvalidEntityID;
+core::EntityID sunID = core::InvalidEntityID;
 
 constexpr uint32_t MaxDirectionalLights = 4u;
 std::array<core::DirectionalLight, MaxDirectionalLights> directionalLights{};
@@ -106,7 +109,7 @@ void Prepare()
     auto sunMaterial = std::make_shared<core::Material>(phongShader);
 
     /* 几何处理阶段 */
-    auto sphere = core::Mesh::CreateSphere(1.f);
+    auto sphere = core::Mesh::CreateCube(1.f);
 
     /* 材质处理阶段 */
     auto earthTex = std::make_shared<core::Texture>("earth.jpg", 0);
@@ -125,21 +128,37 @@ void Prepare()
     sunMaterial->SetFloat("uShininess", 16.f);
 
     /* 实体构造阶段 */
-    earth = std::make_shared<core::Entity>(0u, "Earth");
-    earth->SetMesh(sphere);
-    earth->SetMaterial(earthMaterial);
+    scene = std::make_unique<core::Scene>();
 
-    moon = std::make_shared<core::Entity>(1u, "Moon");
-    moon->SetMesh(sphere);
-    moon->SetMaterial(moonMaterial);
-    moon->GetTransform().SetPosition(glm::vec3(2.f, 0.f, 0.f));
-    moon->GetTransform().SetScale(glm::vec3(0.27f));
+    sunID = scene->CreateEntity("Sun");
+    if (auto *s = scene->GetEntity(sunID))
+    {
+        s->SetMesh(sphere);
+        s->SetMaterial(sunMaterial);
+        s->GetTransform().SetPosition(glm::vec3(0.0f, 0.f, 0.f));
+        s->GetTransform().SetScale(glm::vec3(1.f));
+    }
 
-    sun = std::make_shared<core::Entity>(2u, "Sun");
-    sun->SetMesh(sphere);
-    sun->SetMaterial(sunMaterial);
-    sun->GetTransform().SetPosition(glm::vec3(-6.f, 1.f, 0.f));
-    sun->GetTransform().SetScale(glm::vec3(2.5f));
+    earthID = scene->CreateEntity("Earth");
+    if (auto *e = scene->GetEntity(earthID))
+    {
+        e->SetMesh(sphere);
+        e->SetMaterial(earthMaterial);
+        e->GetTransform().SetPosition(glm::vec3(3.5f, 0.0f, 0.0f));
+        e->GetTransform().SetScale(glm::vec3(0.3f));
+    }
+
+    moonID = scene->CreateEntity("Moon");
+    if (auto *m = scene->GetEntity(moonID))
+    {
+        m->SetMesh(sphere);
+        m->SetMaterial(moonMaterial);
+        m->GetTransform().SetPosition(glm::vec3(2.f, 0.f, 0.f));
+        m->GetTransform().SetScale(glm::vec3(0.1f));
+    }
+
+    scene->Reparent(earthID, sunID);  // 地球挂到太阳
+    scene->Reparent(moonID, earthID); // 月亮挂到地球
 
     /* 光源设置阶段 */
     BuildDirectionalLights();
@@ -154,14 +173,19 @@ void render()
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    earth->GetTransform().SetEulerXyzRad(glm::vec3(0.f, static_cast<float>(glfwGetTime()) * 0.5f, 0.f));
-    earth->Draw(*camera);
+    if (auto *e = scene->GetEntity(earthID))
+        e->GetTransform().SetEulerXyzRad(glm::vec3(0.f, static_cast<float>(glfwGetTime()) * 2.f, 0.f));
 
-    moon->GetTransform().SetEulerXyzRad(glm::vec3(0.f, static_cast<float>(glfwGetTime()) * 0.5f, 0.f));
-    moon->Draw(*camera);
+    if (auto *m = scene->GetEntity(moonID))
+        m->GetTransform().SetEulerXyzRad(glm::vec3(0.f, static_cast<float>(glfwGetTime()) * 0.1f, 0.f));
 
-    sun->GetTransform().SetEulerXyzRad(glm::vec3(0.f, static_cast<float>(glfwGetTime()) * 0.5f, 0.f));
-    sun->Draw(*camera);
+    if (auto *s = scene->GetEntity(sunID))
+        s->GetTransform().SetEulerXyzRad(glm::vec3(0.f, static_cast<float>(glfwGetTime()) * 0.2f, 0.f));
+
+    scene->UpdateWorldMatrices();
+
+    scene->ForEachRenderable([&](core::EntityID, const core::Entity &entity, const glm::mat4 &world, const glm::mat3 &normal)
+                             { entity.Draw(*camera, world, normal); });
 }
 
 int main()
@@ -219,6 +243,3 @@ int main()
     core::Logger::Shutdown();
     return 0;
 }
-/*
-（重要前提：我目前在实现一个opengl的个人渲染器用来作为简历找工作的项目，不需要像商业级引擎一样复杂，只需要项目结构清晰明了，实现高效且优雅，符合工程实践。）
-*/

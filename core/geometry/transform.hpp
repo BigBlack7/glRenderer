@@ -13,13 +13,12 @@ namespace core
 
         /*
             本地变换矩阵(model matrix) = 平移 * 旋转 * 缩放
-            mutable: 允许在const成员函数中修改, 用于实现局部矩阵和法线矩阵的惰性计算和缓存, 逻辑上对象外部状态没变, 只是内部缓存刷新
+            mutable允许在const成员函数中修改, 用于实现局部矩阵和法线矩阵的惰性计算和缓存, 逻辑上对象外部状态没变, 只是内部缓存刷新
+            没有父节点时, 本地变换矩阵就是全局变换矩阵; 有父节点时为相对
         */
         mutable glm::mat4 mLocalMatrix{1.f}; // 等同于Model Matrix
-        mutable glm::mat3 mNormalMatrix{1.f};
 
         mutable bool mLocalDirty{true};
-        mutable bool mNormalDirty{true};
         bool mIsIdentity{true}; // 记录当前是否单位变换, 给上层做快速路径(比如可跳过乘法)
 
     private:
@@ -31,9 +30,6 @@ namespace core
 
         /// @brief 根据当前TRS重算本地变换矩阵
         void RebuildLocalMatrix() const;
-
-        /// @brief 根据当前TRS重算法线变换矩阵
-        void RebuildNormalMatrix() const;
 
     public:
         Transform() = default;
@@ -68,7 +64,6 @@ namespace core
         // Cached matrices
         const glm::mat4 &GetModelMatrix() const { return GetLocalMatrix(); }
         const glm::mat4 &GetLocalMatrix() const;
-        const glm::mat3 &GetNormalMatrix() const;
 
         bool IsIdentity() const { return mIsIdentity; }
     };

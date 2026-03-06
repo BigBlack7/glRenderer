@@ -15,16 +15,13 @@ namespace core
 
     void Transform::MarkDirty()
     {
-        // TRS一变, 局部矩阵和法线矩阵都无效
-        // 法线矩阵依赖局部矩阵, 所以也必须脏
         mLocalDirty = true;
-        mNormalDirty = true;
     }
 
     void Transform::UpdateIdentityFlag()
     {
         // TODO 实现更高效的方案
-        const bool posIdentity = glm::length2(mPosition) <= (detail::Epsilon * detail::Epsilon); // 位置是否近似零向量
+        const bool posIdentity = glm::length2(mPosition) <= (detail::Epsilon * detail::Epsilon);                 // 位置是否近似零向量
         const bool scaleIdentity = glm::length2(mScale - glm::vec3(1.f)) <= (detail::Epsilon * detail::Epsilon); // 缩放是否近似(1, 1, 1)
 
         const glm::quat q = glm::normalize(mRotation); // 旋转先单位化再判断, 避免误差传播
@@ -48,29 +45,6 @@ namespace core
 
         mLocalMatrix = t * r * s;
         mLocalDirty = false;
-    }
-
-    void Transform::RebuildNormalMatrix() const
-    {
-        if (!mNormalDirty)
-            return;
-
-        RebuildLocalMatrix();
-
-        const glm::mat3 model3(mLocalMatrix);
-        const float det = glm::determinant(model3);
-
-        // 法线矩阵 = inverse-transpose(mat3(model))
-        // 奇异矩阵(如某轴scale=0)不可逆: 回退为仅旋转法线变换
-        if (glm::abs(det) <= detail::Epsilon)
-        {
-            mNormalMatrix = glm::mat3_cast(glm::normalize(mRotation));
-        }
-        else
-        {
-            mNormalMatrix = glm::transpose(glm::inverse(model3));
-        }
-        mNormalDirty = false;
     }
 
     void Transform::Reset()
@@ -146,11 +120,5 @@ namespace core
     {
         RebuildLocalMatrix();
         return mLocalMatrix;
-    }
-
-    const glm::mat3 &Transform::GetNormalMatrix() const
-    {
-        RebuildNormalMatrix();
-        return mNormalMatrix;
     }
 }

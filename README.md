@@ -49,15 +49,15 @@
 - ✅ `Material`
   - Manages shader/texture/uniform concepts
 - ⬜ `Light`
-  - Directional Light
-  - Point Light
-  - Spot Light
+  - ✅ Directional Light
+  - ⬜ Point Light
+  - ⬜ Spot Light
 - ✅ `Entity`
   - A renderable unit: binds `Mesh + Material + Transform`
   - one parent(index), multiple children(index vector)
 - ⬜ `Model`
   - Holds a container of `Entity`
-- ⬜ `Scene`
+- ✅ `Scene`
   - Holds `Entity` list, `Model` list, `Light` list
   - Maintain parent-child relationship and logic
 - ⬜ `Renderer`
