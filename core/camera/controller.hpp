@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "camera.hpp"
+#include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <memory>
 #include <array>
@@ -80,6 +81,11 @@ namespace core
         /// @param xoffset 滚轮X偏移量
         /// @param yoffset 滚轮Y偏移量
         void OnScroll(GLFWwindow *window, double xoffset, double yoffset);
+
+        /// @brief 设置所有输入回调函数
+        /// @param app 应用程序实例
+        /// @param camera 相机实例(用于resize回调)
+        void SetupCallbacks(class Application &app, const std::shared_ptr<Camera> &camera);
 
         bool IsControlEnabled() const { return mControlEnabled; }
 

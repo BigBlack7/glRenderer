@@ -42,6 +42,8 @@ namespace core
 
         // 材质特性位掩码
         uint32_t mFeatureFlags{0};
+        // 材质版本号, 用于缓存管理
+        uint64_t mVersion{1};
 
         std::unordered_map<std::string, float> mFloatParams{};
         std::unordered_map<std::string, int> mIntParams{};
@@ -57,6 +59,8 @@ namespace core
 
         /// @brief 根据当前贴图槽重建位掩码, 数据变更后保持一致性
         void RebuildFeatureFlags();
+
+        void BumpVersion() noexcept { ++mVersion; }
 
     public:
         Material() = default;
@@ -92,5 +96,14 @@ namespace core
         void Unbind() const;
 
         uint32_t GetFeatureFlags() const { return mFeatureFlags; }
+        uint64_t GetVersion() const noexcept { return mVersion; }
+
+        /* getter */
+        const std::array<std::shared_ptr<Texture>, TextureSlotCount> &GetTextures() const noexcept { return mTextures; }
+        const std::array<std::string, TextureSlotCount> &GetTextureUniformNames() const noexcept { return mTextureUniformNames; }
+        const std::unordered_map<std::string, float> &GetFloatParams() const noexcept { return mFloatParams; }
+        const std::unordered_map<std::string, int> &GetIntParams() const noexcept { return mIntParams; }
+        const std::unordered_map<std::string, uint32_t> &GetUIntParams() const noexcept { return mUIntParams; }
+        const std::unordered_map<std::string, glm::vec3> &GetVec3Params() const noexcept { return mVec3Params; }
     };
 }

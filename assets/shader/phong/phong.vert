@@ -8,10 +8,15 @@ out vec2 oUV;
 out vec3 oNormal;
 out vec3 oFragPos;
 
+layout(std140, binding = 0)uniform FrameBlock
+{
+    mat4 uV;
+    mat4 uP;
+    vec4 uViewPosTime;
+};
+
 // uniform
 uniform mat4 uM;
-uniform mat4 uV;
-uniform mat4 uP;
 uniform mat3 uN;
 
 void main()

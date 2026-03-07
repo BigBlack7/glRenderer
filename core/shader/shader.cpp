@@ -223,6 +223,27 @@ namespace core
         glUseProgram(0);
     }
 
+    bool Shader::BindUniformBlock(std::string_view blockName, uint32_t bindingPoint) const
+    {
+        const std::string key(blockName);
+        const GLuint blockIndex = glGetUniformBlockIndex(mProgram, key.c_str()); // 查询Uniform Block的索引
+
+        // 处理Uniform Block不存在的情况
+        if (blockIndex == GL_INVALID_INDEX)
+        {
+            // 智能警告系统: 每个缺失的block只警告一次
+            if (mMissingUniformBlockWarned.insert(key).second)
+            {
+                GL_WARN("[Shader] Uniform Block Not Found or Optimized Out: {}", key);
+            }
+            return false;
+        }
+
+        // 将block绑定到指定的binding point
+        glUniformBlockBinding(mProgram, blockIndex, bindingPoint);
+        return true;
+    }
+
     /* setter */
     void Shader::SetFloat(std::string_view name, float value) const
     {

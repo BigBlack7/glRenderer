@@ -23,5 +23,7 @@ namespace core
         /* getter */
         uint32_t GetWidth() const { return mWidth; }
         uint32_t GetHeight() const { return mHeight; }
+        GLuint GetID() const { return mTextureID; }
+        uint32_t GetUnit() const { return mUnit; }
     };
 }

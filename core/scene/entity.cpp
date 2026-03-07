@@ -43,7 +43,7 @@ namespace core
         return IsActive() && IsVisible() && mMesh && mMesh->IsValid() && mMaterial && mMaterial->GetShader();
     }
 
-    void Entity::Draw(const Camera &camera, const glm::mat4 &worldMatrix, const glm::mat3 &worldNormalMatrix) const
+    [[deprecated]] void Entity::Draw(const Camera &camera, const glm::mat4 &worldMatrix, const glm::mat3 &worldNormalMatrix) const
     {
         if (!CanRender())
             return;

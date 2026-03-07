@@ -2,12 +2,14 @@
 #define MAX_DIRECTIONAL_LIGHTS 4
 #endif
 
-struct DirectionalLight
+struct DirectionalLightGpu
 {
-    vec3 direction;
-    vec3 color;
-    float intensity;
+    vec4 direction; // xyz: direction
+    vec4 colorIntensity; // rgb: color, a: intensity
 };
 
-uniform int uDirectionalLightCount;
-uniform DirectionalLight uDirectionalLights[MAX_DIRECTIONAL_LIGHTS];
+layout(std140, binding = 1)uniform LightBlock
+{
+    ivec4 uDirectionalLightMeta; // x = directional light count
+    DirectionalLightGpu uDirectionalLights[MAX_DIRECTIONAL_LIGHTS];
+};

@@ -77,6 +77,6 @@ namespace core
         /// @brief 绘制自身实体, 不递归子实体; 层级遍历由Scene/Renderer负责
         /// @param camera 相机对象, 用于获取视图矩阵和投影矩阵
         /// @param parentWorld 父实体的世界矩阵, 默认单位矩阵
-        void Draw(const Camera &camera, const glm::mat4 &worldMatrix, const glm::mat3 &worldNormalMatrix) const;
+        [[deprecated]] void Draw(const Camera &camera, const glm::mat4 &worldMatrix, const glm::mat3 &worldNormalMatrix) const;
     };
 }

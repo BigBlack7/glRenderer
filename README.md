@@ -11,6 +11,7 @@
 - struct member var name(--xxXxx--)
 - all funcs name(XxXxx)
 - temporary var or func var(xxXxx)
+- cpu to gpu data var name keep same
 
 # Implemented
 
@@ -18,16 +19,19 @@
     Roaming Camera
     Shader
     Texture
+    Material
     Mesh
+    Transform
+    Entity
+    Lights
+    Scene
 
 # Todo
 
-    Lights
     Shadow Mapping
     Disney PBR
     NPR
     IBL
-    Transform
     Post Process
     Deferred Rendering Pipeline
     IMGUI Editor
@@ -35,7 +39,7 @@
 
 # Architecture Design
 
-> Disclaimer: Children don't understand things and just play around(免责声明: 小孩子不懂事做着玩的😋).
+> Disclaimer: (免责声明: 小孩子不懂事做着玩的😋)Children don't understand things and just play around.
 > Goal: clear and practical renderer architecture for portfolio project.  
 > Scope now: concept-first, lightweight implementation.
 
@@ -60,7 +64,7 @@
 - ✅ `Scene`
   - Holds `Entity` list, `Model` list, `Light` list
   - Maintain parent-child relationship and logic
-- ⬜ `Renderer`
+- ✅ `Renderer`
   - Stateless service entry
   - Interface: `Render(const Scene&, const Camera&)`
 
@@ -89,7 +93,7 @@ graph TD
     Camera --> Renderer
 ```
 
-## Per-frame Render Flow (Concept)
+## Per-frame Render Flow
 
 ```mermaid
 flowchart LR

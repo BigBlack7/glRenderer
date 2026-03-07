@@ -18,6 +18,7 @@ namespace core
 
         mutable std::unordered_map<std::string, GLint> mUniformLocationCache{};
         mutable std::unordered_set<std::string> mMissingUniformWarned{};
+        mutable std::unordered_set<std::string> mMissingUniformBlockWarned{};
 
         enum class CheckType
         {
@@ -71,6 +72,12 @@ namespace core
 
         /* getter */
         GLuint GetID() const noexcept { return mProgram; }
+
+        /// @brief 将着色器程序中的uniform块绑定到指定的绑定点上, 以便后续通过绑定点访问该uniform块的数据
+        /// @param blockName uniform块名称
+        /// @param bindingPoint 绑定点
+        /// @return 是否绑定成功
+        bool BindUniformBlock(std::string_view blockName, uint32_t bindingPoint) const;
 
         /* setter -> 通过着色器程序ID和uniform变量名获取uniform变量的位置, 然后设置uniform变量的值为value */
         void SetFloat(std::string_view name, float value) const;

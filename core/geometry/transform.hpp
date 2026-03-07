@@ -62,7 +62,6 @@ namespace core
         glm::vec3 GetScale() const { return mScale; }
 
         // Cached matrices
-        const glm::mat4 &GetModelMatrix() const { return GetLocalMatrix(); }
         const glm::mat4 &GetLocalMatrix() const;
 
         bool IsIdentity() const { return mIsIdentity; }

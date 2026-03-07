@@ -1,10 +1,10 @@
-﻿// core
-#include <application/application.hpp>
+﻿#include <application/application.hpp>
 #include <camera/camera.hpp>
 #include <camera/controller.hpp>
 #include <geometry/mesh.hpp>
 #include <geometry/transform.hpp>
 #include <material/material.hpp>
+#include <renderer/renderer.hpp>
 #include <scene/entity.hpp>
 #include <scene/scene.hpp>
 #include <light/light.hpp>
@@ -12,6 +12,7 @@
 #include <texture/texture.hpp>
 #include <utils/logger.hpp>
 
+std::unique_ptr<core::Renderer> renderer = nullptr;
 std::shared_ptr<core::Camera> camera = nullptr;
 std::unique_ptr<core::CameraController> controller = nullptr;
 std::shared_ptr<core::Shader> phongShader = nullptr;
@@ -21,83 +22,36 @@ core::EntityID earthID = core::InvalidEntityID;
 core::EntityID moonID = core::InvalidEntityID;
 core::EntityID sunID = core::InvalidEntityID;
 
-constexpr uint32_t MaxDirectionalLights = 4u;
-std::array<core::DirectionalLight, MaxDirectionalLights> directionalLights{};
-uint32_t directionalLightCount = 0u;
-
-static constexpr std::array<const char *, MaxDirectionalLights> DirDirectionUniforms{
-    "uDirectionalLights[0].direction",
-    "uDirectionalLights[1].direction",
-    "uDirectionalLights[2].direction",
-    "uDirectionalLights[3].direction"};
-
-static constexpr std::array<const char *, MaxDirectionalLights> DirColorUniforms{
-    "uDirectionalLights[0].color",
-    "uDirectionalLights[1].color",
-    "uDirectionalLights[2].color",
-    "uDirectionalLights[3].color"};
-
-static constexpr std::array<const char *, MaxDirectionalLights> DirIntensityUniforms{
-    "uDirectionalLights[0].intensity",
-    "uDirectionalLights[1].intensity",
-    "uDirectionalLights[2].intensity",
-    "uDirectionalLights[3].intensity"};
-
 void BuildDirectionalLights()
 {
-    directionalLightCount = 0u;
+    if (!scene)
+        return;
 
-    // 主光 - 红色, 从右上方照射
+    scene->ClearDirectionalLights();
+
     core::DirectionalLight mainLight;
     mainLight.SetDirection(glm::vec3(-1.0f, -1.0f, 0.5f));
     mainLight.SetColor(glm::vec3(1.0f, 0.2f, 0.2f));
     mainLight.SetIntensity(0.8f);
-    directionalLights[directionalLightCount++] = mainLight;
+    scene->AddDirectionalLight(mainLight);
 
-    // 补光 - 绿色, 从左前方照射
     core::DirectionalLight fillLight;
     fillLight.SetDirection(glm::vec3(0.8f, -0.6f, 0.5f));
     fillLight.SetColor(glm::vec3(0.2f, 1.0f, 0.2f));
     fillLight.SetIntensity(0.6f);
-    directionalLights[directionalLightCount++] = fillLight;
+    scene->AddDirectionalLight(fillLight);
 
-    // 背光 - 蓝色, 从后方照射
     core::DirectionalLight backLight;
     backLight.SetDirection(glm::vec3(0.0f, -0.5f, -1.0f));
     backLight.SetColor(glm::vec3(0.2f, 0.2f, 1.0f));
     backLight.SetIntensity(0.4f);
-    directionalLights[directionalLightCount++] = backLight;
+    scene->AddDirectionalLight(backLight);
 
-    // 顶光 - 黄色, 从正上方照射
     core::DirectionalLight topLight;
     topLight.SetDirection(glm::vec3(0.0f, -1.0f, 0.0f));
     topLight.SetColor(glm::vec3(1.0f, 1.0f, 0.2f));
     topLight.SetIntensity(0.3f);
-    directionalLights[directionalLightCount++] = topLight;
-}
-
-void UploadDirectionalLights()
-{
-    if (!phongShader)
-        return;
-
-    phongShader->Begin();
-
-    uint32_t uploadCount = 0u;
-    for (uint32_t i = 0; i < directionalLightCount && uploadCount < MaxDirectionalLights; ++i)
-    {
-        const auto &light = directionalLights[i];
-        if (!light.IsEnabled())
-            continue;
-
-        phongShader->SetVec3(DirDirectionUniforms[uploadCount], light.GetDirection());
-        phongShader->SetVec3(DirColorUniforms[uploadCount], light.GetColor());
-        phongShader->SetFloat(DirIntensityUniforms[uploadCount], light.GetIntensity());
-        ++uploadCount;
-    }
-
-    phongShader->SetInt("uDirectionalLightCount", static_cast<int>(uploadCount));
-    phongShader->End();
+    scene->AddDirectionalLight(topLight);
 }
 
 void Prepare()
@@ -109,7 +63,7 @@ void Prepare()
     auto sunMaterial = std::make_shared<core::Material>(phongShader);
 
     /* 几何处理阶段 */
-    auto sphere = core::Mesh::CreateCube(1.f);
+    auto sphere = core::Mesh::CreateSphere(1.f);
 
     /* 材质处理阶段 */
     auto earthTex = std::make_shared<core::Texture>("earth.jpg", 0);
@@ -162,7 +116,6 @@ void Prepare()
 
     /* 光源设置阶段 */
     BuildDirectionalLights();
-    UploadDirectionalLights();
 
     /* 渲染状态设置阶段 */
     glEnable(GL_DEPTH_TEST);
@@ -171,8 +124,6 @@ void Prepare()
 
 void render()
 {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
     if (auto *e = scene->GetEntity(earthID))
         e->GetTransform().SetEulerXyzRad(glm::vec3(0.f, static_cast<float>(glfwGetTime()) * 2.f, 0.f));
 
@@ -184,8 +135,8 @@ void render()
 
     scene->UpdateWorldMatrices();
 
-    scene->ForEachRenderable([&](core::EntityID, const core::Entity &entity, const glm::mat4 &world, const glm::mat3 &normal)
-                             { entity.Draw(*camera, world, normal); });
+    if (renderer && scene && camera)
+        renderer->Render(*scene, *camera, static_cast<float>(glfwGetTime()));
 }
 
 int main()
@@ -202,44 +153,30 @@ int main()
     camera = std::make_shared<core::Camera>(core::Camera::CreatePerspective(45.f, static_cast<float>(WIDTH) / static_cast<float>(HEIGHT), 0.1f, 100.f));
     controller = std::make_unique<core::CameraController>();
     controller->SetCamera(camera);
+    controller->SetupCallbacks(App, camera);
 
-    // 注册各类回调函数
-    App.SetResizeCallback([](uint32_t width, uint32_t height) { // 窗口大小监听
-        glViewport(0, 0, width, height);
-        if (height != 0)
-            camera->SetAspect(static_cast<float>(width) / static_cast<float>(height));
-    });
-
-    App.SetKeyCallback([](GLFWwindow *window, int key, int scancode, int action, int mods) { // 键盘监听
-        controller->OnKey(window, key, scancode, action, mods);
-    });
-
-    App.SetMouseCallback([](GLFWwindow *window, int button, int action, int mods) { // 鼠标点击监听
-        controller->OnMouseButton(window, button, action, mods);
-    });
-
-    App.SetCursorCallback([](GLFWwindow *window, double xpos, double ypos) { // 鼠标位置监听
-        controller->OnCursorPos(window, xpos, ypos);
-    });
-
-    App.SetScrollCallback([](GLFWwindow *window, double xoffset, double yoffset) { // 鼠标滚轮监听
-        controller->OnScroll(window, xoffset, yoffset);
-    });
-
-    glViewport(0, 0, WIDTH, HEIGHT);
-    glClearColor(0.68f, 0.85f, 0.90f, 1.f);
+    renderer = std::make_unique<core::Renderer>();
+    renderer->SetClearColor(glm::vec4(0.68f, 0.85f, 0.90f, 1.f));
+    renderer->Init();
 
     Prepare();
 
-    while (App.Update())
+    while (true)
     {
         controller->Update(App.GetDeltaTime());
 
         render();
+
+        if (!App.Update()) // 避免先交换缓冲区再渲染
+            break;
     }
+
+    if (renderer)
+        renderer->Shutdown();
 
     App.Destroy();
     /* ************************************************************************************************ */
     core::Logger::Shutdown();
     return 0;
 }
+// (重要前提: 我目前在实现一个OpenGL的个人渲染器用来作为简历找工作的项目, 不需要像商业级引擎一样复杂, 只需要项目结构清晰明了, 实现高效且优雅, 符合现代工程实践。)

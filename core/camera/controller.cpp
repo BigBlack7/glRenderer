@@ -1,6 +1,6 @@
 ﻿#include "controller.hpp"
+#include "application/application.hpp"
 #include "utils/logger.hpp"
-#include <GLFW/glfw3.h>
 #include <cmath>
 
 namespace core
@@ -182,5 +182,32 @@ namespace core
 
         // 把滚轮Y偏移交给相机统一处理(透视FOV/正交盒缩放)
         mCamera->Zoom(static_cast<float>(yoffset));
+    }
+
+    void CameraController::SetupCallbacks(Application &app, const std::shared_ptr<Camera> &camera)
+    {
+        // 设置窗口大小回调
+        app.SetResizeCallback([camera](uint32_t width, uint32_t height) { // 窗口大小监听
+            glViewport(0, 0, width, height);
+            if (height != 0)
+                camera->SetAspect(static_cast<float>(width) / static_cast<float>(height));
+        });
+
+        // 设置输入设备回调
+        app.SetKeyCallback([this](GLFWwindow *window, int key, int scancode, int action, int mods) { // 键盘监听
+            this->OnKey(window, key, scancode, action, mods);
+        });
+
+        app.SetMouseCallback([this](GLFWwindow *window, int button, int action, int mods) { // 鼠标点击监听
+            this->OnMouseButton(window, button, action, mods);
+        });
+
+        app.SetCursorCallback([this](GLFWwindow *window, double xpos, double ypos) { // 鼠标位置监听
+            this->OnCursorPos(window, xpos, ypos);
+        });
+        
+        app.SetScrollCallback([this](GLFWwindow *window, double xoffset, double yoffset) { // 鼠标滚轮监听
+            this->OnScroll(window, xoffset, yoffset);
+        });
     }
 }

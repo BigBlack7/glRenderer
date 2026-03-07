@@ -18,7 +18,13 @@ uniform float uShininess;
 
 const uint MAT_HAS_ALBEDO_TEX = (1u << 0u);
 
-// light
+layout(std140, binding = 0)uniform FrameBlock
+{
+    mat4 uV;
+    mat4 uP;
+    vec4 uViewPosTime;
+};
+
 #include "../common/light.glsl"
 
 void main()
@@ -31,18 +37,18 @@ void main()
     vec3 diffuse_color = vec3(0.0);
     vec3 specular_color = vec3(0.0);
     
-    int light_count = clamp(uDirectionalLightCount, 0, MAX_DIRECTIONAL_LIGHTS);
+    int light_count = clamp(uDirectionalLightMeta.x, 0, MAX_DIRECTIONAL_LIGHTS);
     
     for(int i = 0; i < light_count; ++ i)
     {
-        DirectionalLight light = uDirectionalLights[i];
+        DirectionalLightGpu light = uDirectionalLights[i];
+        float intensity = light.colorIntensity.a;
         
-        if (light.intensity <= 0.0)
-        continue;
+        if (intensity <= 0.0)continue;
         
-        vec3 Ld = normalize(light.direction); // 光线方向(世界空间)
+        vec3 Ld = normalize(light.direction.xyz); // 光线方向(世界空间)
         vec3 L = normalize(-Ld);
-        vec3 radiance = light.color * light.intensity;
+        vec3 radiance = light.colorIntensity.rgb * intensity;
         
         float diffuse = max(dot(N, L), 0.0);
         diffuse_color += radiance * diffuse * object_color;
