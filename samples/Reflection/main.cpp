@@ -54,7 +54,7 @@ void BuildDirectionalLights()
     scene->AddDirectionalLight(topLight);
 }
 
-void Prepare()
+void ScenePrepare()
 {
     /* shader处理阶段 */
     phongShader = std::make_shared<core::Shader>("phong/phong.vert", "phong/phong.frag");
@@ -116,10 +116,6 @@ void Prepare()
 
     /* 光源设置阶段 */
     BuildDirectionalLights();
-
-    /* 渲染状态设置阶段 */
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
 }
 
 void render()
@@ -132,8 +128,6 @@ void render()
 
     if (auto *s = scene->GetEntity(sunID))
         s->GetTransform().SetEulerXyzRad(glm::vec3(0.f, static_cast<float>(glfwGetTime()) * 0.2f, 0.f));
-
-    scene->UpdateWorldMatrices();
 
     if (renderer && scene && camera)
         renderer->Render(*scene, *camera, static_cast<float>(glfwGetTime()));
@@ -159,7 +153,7 @@ int main()
     renderer->SetClearColor(glm::vec4(0.68f, 0.85f, 0.90f, 1.f));
     renderer->Init();
 
-    Prepare();
+    ScenePrepare();
 
     while (true)
     {
@@ -179,4 +173,3 @@ int main()
     core::Logger::Shutdown();
     return 0;
 }
-// (重要前提: 我目前在实现一个OpenGL的个人渲染器用来作为简历找工作的项目, 不需要像商业级引擎一样复杂, 只需要项目结构清晰明了, 实现高效且优雅, 符合现代工程实践。)

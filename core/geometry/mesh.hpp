@@ -51,15 +51,6 @@ namespace core
         /// @param indices
         void SetData(const std::vector<MeshVertex> &vertices, const std::vector<uint32_t> &indices);
 
-        /// @brief 绑定VAO, 准备绘制
-        void Bind() const;
-
-        /// @brief 解绑VAO, 恢复默认状态
-        void Unbind() const;
-
-        /// @brief 绘制网格
-        void Draw() const;
-
         /// @brief 检查网格是否有效(VAO已创建且至少有一个顶点)
         /// @return true如果有效, 否则false
         bool IsValid() const { return mVAO != 0 && mVertexCount > 0; }

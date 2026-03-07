@@ -115,7 +115,7 @@ namespace core
         mFrameCount = 0;
         mFPS = 0.0;
 
-        GL_INFO("[Application] GLRenderer Init");
+        GL_INFO("[Application] GLWindow Init Success With {}x{}", mWidth, mHeight);
         return true;
     }
 
@@ -149,6 +149,6 @@ namespace core
     {
         mWindow.reset();
         glfwTerminate();
-        GL_INFO("[Application] GLRenderer Shutdown");
+        GL_INFO("[Application] GLWindow Shutdown");
     }
 }

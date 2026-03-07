@@ -122,33 +122,6 @@ namespace core
         glBindVertexArray(0);
     }
 
-    void Mesh::Bind() const
-    {
-        glBindVertexArray(mVAO);
-    }
-
-    void Mesh::Unbind() const
-    {
-        glBindVertexArray(0);
-    }
-
-    void Mesh::Draw() const
-    {
-        if (!IsValid())
-            return;
-
-        glBindVertexArray(mVAO);
-        if (mIndexCount > 0) // 索引绘制使用EBO提供顶点重用
-        {
-            glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(mIndexCount), GL_UNSIGNED_INT, nullptr);
-        }
-        else // 无索引绘制按顶点顺序绘制
-        {
-            glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(mVertexCount));
-        }
-        glBindVertexArray(0);
-    }
-
     std::shared_ptr<Mesh> Mesh::CreatePlane(float size)
     {
         const float h = size * 0.5f;

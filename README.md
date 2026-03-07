@@ -1,6 +1,6 @@
 ﻿# GLRenderer
 
-- Build it by MSVC
+- Build it by MSVC With C++20
 
 # NameFormat
 
@@ -13,38 +13,18 @@
 - temporary var or func var(xxXxx)
 - cpu to gpu data var name keep same
 
-# Implemented
-
-    GLFW Window
-    Roaming Camera
-    Shader
-    Texture
-    Material
-    Mesh
-    Transform
-    Entity
-    Lights
-    Scene
-
-# Todo
-
-    Shadow Mapping
-    Disney PBR
-    NPR
-    IBL
-    Post Process
-    Deferred Rendering Pipeline
-    IMGUI Editor
-    Assimp Model Loader
-
 # Architecture Design
 
-> Disclaimer: (免责声明: 小孩子不懂事做着玩的😋)Children don't understand things and just play around.
-> Goal: clear and practical renderer architecture for portfolio project.  
-> Scope now: concept-first, lightweight implementation.
+> Disclaimer: 小孩子👶不懂事做着玩的😋.
 
 ## Core Features
 
+- ✅ `Window`
+  - GLFW window wrapper
+  - Input event handling
+- ✅ `Camera`
+  - Roaming camera with mouse/keyboard
+  - Perspective projection & orthographic projection
 - ✅ `Mesh`
   - Holds geometry data and GPU resources (VAO/VBO/EBO)
   - Primitive factory functions can generate cube/sphere/plane for testing
@@ -58,7 +38,7 @@
   - ⬜ Spot Light
 - ✅ `Entity`
   - A renderable unit: binds `Mesh + Material + Transform`
-  - one parent(index), multiple children(index vector)
+  - one parent(index), multiple children
 - ⬜ `Model`
   - Holds a container of `Entity`
 - ✅ `Scene`
@@ -67,6 +47,14 @@
 - ✅ `Renderer`
   - Stateless service entry
   - Interface: `Render(const Scene&, const Camera&)`
+- ⬜ `Assimp Model Loader`
+- ⬜ `Shadow Mapping`
+- ⬜ `Disney PBR`
+- ⬜ `NPR`
+- ⬜ `IBL`
+- ⬜ `Post Process`
+- ⬜ `Deferred Rendering Pipeline`
+- ⬜ `IMGUI Editor`
 
 ## Module Graph
 
@@ -103,17 +91,3 @@ flowchart LR
     D --> E["Submit Draw Calls"]
     E --> F["Present"]
 ```
-
-## Runtime Data Flow (Current Stage)
-
-1. Create primitives (`Mesh`) for quick testing
-2. Create `Entity(mesh, material, transform)`
-3. Optional: group entities into `Model`
-4. Add `Entity/Model/Light` into `Scene`
-5. Call `Renderer::Render(scene, camera)`
-
-## Reserved Extension Points
-
-- `RenderState` system (pipeline state grouping/sorting)
-- `AssetManager` (resource cache & deduplication)
-- Advanced materials/lights/shadows/post-process

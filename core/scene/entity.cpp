@@ -42,22 +42,4 @@ namespace core
     {
         return IsActive() && IsVisible() && mMesh && mMesh->IsValid() && mMaterial && mMaterial->GetShader();
     }
-
-    [[deprecated]] void Entity::Draw(const Camera &camera, const glm::mat4 &worldMatrix, const glm::mat3 &worldNormalMatrix) const
-    {
-        if (!CanRender())
-            return;
-
-        mMaterial->Bind();
-        const auto &shader = mMaterial->GetShader();
-
-        shader->SetMat4("uP", camera.GetProjectionMatrix());
-        shader->SetMat4("uV", camera.GetViewMatrix());
-        shader->SetMat4("uM", worldMatrix);
-        shader->SetMat3("uN", worldNormalMatrix);
-        shader->SetVec3("uViewPos", camera.GetPosition());
-
-        mMesh->Draw();
-        mMaterial->Unbind();
-    }
 }

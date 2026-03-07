@@ -213,16 +213,6 @@ namespace core
         Release();
     }
 
-    void Shader::Begin() const noexcept
-    {
-        glUseProgram(mProgram);
-    }
-
-    void Shader::End() const noexcept
-    {
-        glUseProgram(0);
-    }
-
     bool Shader::BindUniformBlock(std::string_view blockName, uint32_t bindingPoint) const
     {
         const std::string key(blockName);

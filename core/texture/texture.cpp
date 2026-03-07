@@ -41,16 +41,4 @@ namespace core
     {
         glDeleteTextures(1, &mTextureID);
     }
-
-    void Texture::Bind() const
-    {
-        glActiveTexture(GL_TEXTURE0 + mUnit);
-        glBindTexture(GL_TEXTURE_2D, mTextureID);
-    }
-
-    void Texture::Bind(uint32_t unit) const
-    {
-        glActiveTexture(GL_TEXTURE0 + unit);
-        glBindTexture(GL_TEXTURE_2D, mTextureID);
-    }
 }

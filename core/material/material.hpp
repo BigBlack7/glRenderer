@@ -92,9 +92,6 @@ namespace core
         void SetUInt(std::string_view name, uint32_t value);
         void SetVec3(std::string_view name, const glm::vec3 &value);
 
-        void Bind() const;
-        void Unbind() const;
-
         uint32_t GetFeatureFlags() const { return mFeatureFlags; }
         uint64_t GetVersion() const noexcept { return mVersion; }
 

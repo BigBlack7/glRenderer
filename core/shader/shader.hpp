@@ -67,9 +67,6 @@ namespace core
         Shader(const Shader &) = delete;
         Shader &operator=(const Shader &) = delete;
 
-        void Begin() const noexcept;
-        void End() const noexcept;
-
         /* getter */
         GLuint GetID() const noexcept { return mProgram; }
 
