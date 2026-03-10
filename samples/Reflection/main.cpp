@@ -12,6 +12,11 @@
 #include <texture/texture.hpp>
 #include <utils/logger.hpp>
 
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
+#include <glm/gtc/type_ptr.hpp>
+
 std::unique_ptr<core::Renderer> renderer = nullptr;
 std::shared_ptr<core::Camera> camera = nullptr;
 std::unique_ptr<core::CameraController> controller = nullptr;
@@ -30,26 +35,26 @@ void BuildDirectionalLights()
     scene->ClearDirectionalLights();
 
     core::DirectionalLight mainLight;
-    mainLight.SetDirection(glm::vec3(-1.0f, -1.0f, 0.5f));
-    mainLight.SetColor(glm::vec3(1.0f, 0.2f, 0.2f));
+    mainLight.SetDirection(glm::vec3(-1.f, -1.f, 0.5f));
+    mainLight.SetColor(glm::vec3(1.f, 0.2f, 0.2f));
     mainLight.SetIntensity(0.8f);
     scene->AddDirectionalLight(mainLight);
 
     core::DirectionalLight fillLight;
     fillLight.SetDirection(glm::vec3(0.8f, -0.6f, 0.5f));
-    fillLight.SetColor(glm::vec3(0.2f, 1.0f, 0.2f));
+    fillLight.SetColor(glm::vec3(0.2f, 1.f, 0.2f));
     fillLight.SetIntensity(0.6f);
     scene->AddDirectionalLight(fillLight);
 
     core::DirectionalLight backLight;
-    backLight.SetDirection(glm::vec3(0.0f, -0.5f, -1.0f));
-    backLight.SetColor(glm::vec3(0.2f, 0.2f, 1.0f));
+    backLight.SetDirection(glm::vec3(0.f, -0.5f, -1.f));
+    backLight.SetColor(glm::vec3(0.2f, 0.2f, 1.f));
     backLight.SetIntensity(0.4f);
     scene->AddDirectionalLight(backLight);
 
     core::DirectionalLight topLight;
-    topLight.SetDirection(glm::vec3(0.0f, -1.0f, 0.0f));
-    topLight.SetColor(glm::vec3(1.0f, 1.0f, 0.2f));
+    topLight.SetDirection(glm::vec3(0.f, -1.f, 0.f));
+    topLight.SetColor(glm::vec3(1.f, 1.f, 0.2f));
     topLight.SetIntensity(0.3f);
     scene->AddDirectionalLight(topLight);
 }
@@ -120,17 +125,31 @@ void ScenePrepare()
 
 void render()
 {
+    float time = static_cast<float>(glfwGetTime());
+
     if (auto *e = scene->GetEntity(earthID))
-        e->GetTransform().SetEulerXyzRad(glm::vec3(0.f, static_cast<float>(glfwGetTime()) * 2.f, 0.f));
+        e->GetTransform().SetEulerXyzRad(glm::vec3(0.f, time * 2.f, 0.f));
 
     if (auto *m = scene->GetEntity(moonID))
-        m->GetTransform().SetEulerXyzRad(glm::vec3(0.f, static_cast<float>(glfwGetTime()) * 0.1f, 0.f));
+        m->GetTransform().SetEulerXyzRad(glm::vec3(0.f, time * 0.1f, 0.f));
 
     if (auto *s = scene->GetEntity(sunID))
-        s->GetTransform().SetEulerXyzRad(glm::vec3(0.f, static_cast<float>(glfwGetTime()) * 0.2f, 0.f));
+        s->GetTransform().SetEulerXyzRad(glm::vec3(0.f, time * 0.2f, 0.f));
 
     if (renderer && scene && camera)
-        renderer->Render(*scene, *camera, static_cast<float>(glfwGetTime()));
+        renderer->Render(*scene, *camera, time);
+}
+
+glm::vec4 clearColor{0.68f, 0.85f, 0.90f, 1.f};
+
+void initIMGUI(GLFWwindow *window)
+{
+    ImGui::CreateContext();   // create imgui memory
+    ImGui::StyleColorsDark(); // select theme
+
+    // bind imgui to glfw and opengl
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 460");
 }
 
 int main()
@@ -138,8 +157,8 @@ int main()
     core::Logger::Init();
     /* ************************************************************************************************ */
     auto &App = core::Application::GetApp();
-    constexpr uint32_t WIDTH = 1960;
-    constexpr uint32_t HEIGHT = 1080;
+    constexpr uint32_t WIDTH = 1960u;
+    constexpr uint32_t HEIGHT = 1080u;
 
     if (!App.Init(WIDTH, HEIGHT))
         return -1;
@@ -150,26 +169,39 @@ int main()
     controller->SetupCallbacks(App, camera);
 
     renderer = std::make_unique<core::Renderer>();
-    renderer->SetClearColor(glm::vec4(0.68f, 0.85f, 0.90f, 1.f));
     renderer->Init();
 
     ScenePrepare();
-
+    initIMGUI(App.GetWindow());
     while (true)
     {
         controller->Update(App.GetDeltaTime());
 
+        // 开始ImGui帧
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        // 构建UI
+        ImGui::Begin("Settings");
+        ImGui::ColorEdit3("Clear Color", glm::value_ptr(clearColor));
+        ImGui::End();
+        
+        renderer->SetClearColor(clearColor);
         render();
+
+        // 渲染ImGui
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         if (!App.Update()) // 避免先交换缓冲区再渲染
             break;
     }
 
-    if (renderer)
-        renderer->Shutdown();
-
+    renderer->Shutdown();
     App.Destroy();
     /* ************************************************************************************************ */
     core::Logger::Shutdown();
     return 0;
 }
+// (重要前提: 我目前在实现一个OpenGL的个人渲染器用来作为简历找工作的项目, 不需要像商业级引擎一样复杂, 只需要项目结构清晰明了, 实现高效且优雅, 符合现代工程实践。)

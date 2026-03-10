@@ -51,7 +51,7 @@ namespace core
     {
         if (size <= 0)
         {
-            GL_ERROR("[UniformBuffer] Create Failed: size <= 0");
+            GL_ERROR("[UniformBuffer] Create Failed: Size <= 0");
             return false;
         }
 

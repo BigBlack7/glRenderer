@@ -102,7 +102,7 @@ namespace core
         glfwSetWindowUserPointer(mWindow.get(), this);
 
         glfwSetFramebufferSizeCallback(mWindow.get(), FramebufferSizeCallback); // 窗口大小监听
-        glfwSetKeyCallback(mWindow.get(), KeyBoardCallback);                    // 键盘监听
+        glfwSetKeyCallback(mWindow.get(), KeyBoardCallback);                    // 键盘按键监听
         glfwSetMouseButtonCallback(mWindow.get(), MouseButtonCallback);         // 鼠标点击监听
         glfwSetCursorPosCallback(mWindow.get(), CursorPositionCallback);        // 鼠标位置监听
         glfwSetScrollCallback(mWindow.get(), MouseScrollCallback);              // 鼠标滚轮监听

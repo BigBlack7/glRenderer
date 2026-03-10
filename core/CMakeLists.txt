@@ -20,3 +20,5 @@ target_link_libraries(core
     tinyexr
     spdlog::spdlog
 )
+
+list(FILTER CORE EXCLUDE REGEX ".*[\\\\/]renderer[\\\\/]todo[\\\\/].*")

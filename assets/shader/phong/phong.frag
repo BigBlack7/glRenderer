@@ -41,7 +41,7 @@ void main()
     
     for(int i = 0; i < light_count; ++ i)
     {
-        DirectionalLightGpu light = uDirectionalLights[i];
+        DirectionalLightGPU light = uDirectionalLights[i];
         float intensity = light.colorIntensity.a;
         
         if (intensity <= 0.0)continue;

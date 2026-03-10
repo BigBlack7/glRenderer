@@ -99,6 +99,7 @@ namespace core
         uint32_t GetHeight() const { return mHeight; }
         float GetDeltaTime() const { return mDeltaTime; }
         double GetFPS() const { return mFPS; }
+        GLFWwindow *GetWindow() const { return mWindow.get(); }
         void GetCursorPosition(double &xpos, double &ypos) const { glfwGetCursorPos(mWindow.get(), &xpos, &ypos); }
 
         // setters

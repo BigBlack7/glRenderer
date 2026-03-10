@@ -7,11 +7,16 @@ namespace core
 {
     constexpr uint32_t MaxDirectionalLights = 4u;
 
-    struct DirectionalLightGpu final
+    struct DirectionalLightGPU final
     {
         alignas(16) glm::vec4 direction{0.f, -1.f, 0.f, 0.f};
-        alignas(16) glm::vec4 colorIntensity{1.f, 1.f, 1.f, 1.f}; // w分量存储强度
+        alignas(16) glm::vec4 colorIntensity{1.f, 1.f, 1.f, 1.f}; // xyz为颜色, w分量存储强度
     };
+
+    /*
+        每帧只更新一次, 所有物体共享的数据使用UBO传输
+        每个物体都不同, 每帧需要更新多次直接使用Uniform
+    */
 
     struct FrameBlockData final // UBO-0
     {
@@ -23,6 +28,6 @@ namespace core
     struct LightBlockData final // UBO-1
     {
         alignas(16) glm::ivec4 uDirectionalLightMeta{0, 0, 0, 0}; // x分量存储定向光数量, yzw分量保留
-        alignas(16) std::array<DirectionalLightGpu, MaxDirectionalLights> uDirectionalLights{};
+        alignas(16) std::array<DirectionalLightGPU, MaxDirectionalLights> uDirectionalLights{};
     };
 }

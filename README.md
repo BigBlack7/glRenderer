@@ -1,6 +1,7 @@
 ﻿# GLRenderer
 
-- Build it by MSVC With C++20
+- Build it by MSVC With C++20.
+- Refer to LearOpenGL, Godot, Unity and So on.
 
 # NameFormat
 
@@ -46,6 +47,7 @@
   - Maintain parent-child relationship and logic
 - ✅ `Renderer`
   - Stateless service entry
+  - Renderer Pass & Renderer Graph Architecture
   - Interface: `Render(const Scene&, const Camera&)`
 - ⬜ `Assimp Model Loader`
 - ⬜ `Shadow Mapping`
