@@ -33,7 +33,11 @@ namespace core
         // 初始化状态缓存和光照缓存
         mStateCache.Reset();
         mCachedDirectionalCount = std::numeric_limits<uint32_t>::max();
-        mCachedLightVersions.fill(std::numeric_limits<uint64_t>::max());
+        mCachedDirectionalVersions.fill(std::numeric_limits<uint64_t>::max());
+        mCachedPointCount = std::numeric_limits<uint32_t>::max();
+        mCachedPointVersions.fill(std::numeric_limits<uint64_t>::max());
+        mCachedSpotCount = std::numeric_limits<uint32_t>::max();
+        mCachedSpotVersions.fill(std::numeric_limits<uint64_t>::max());
         mProgramBlockBoundCache.clear();
 
         mInitialized = true;
@@ -87,40 +91,88 @@ namespace core
         mFrameBlockUBO.SetData(static_cast<GLsizeiptr>(sizeof(FrameBlockData)), &frame);
     }
 
-    void RenderBackend::UploadLightBlock(std::span<const DirectionalLight> directionalLights)
+    void RenderBackend::UploadLightBlock(std::span<const DirectionalLight> directionalLights,
+                                         std::span<const PointLight> pointLights,
+                                         std::span<const SpotLight> spotLights)
     {
         LightBlockData lightBlock{};
-        std::array<uint64_t, MaxDirectionalLights> currentVersions{};
-        currentVersions.fill(0u);
 
-        // 收集有效光源数据
-        uint32_t activeCount = 0u;
+        // 收集有效方向光源数据
+        std::array<uint64_t, MaxDirectionalLights> dirVersions{};
+        dirVersions.fill(0u);
+        uint32_t activeDirCount = 0u;
         for (const auto &light : directionalLights)
         {
-            if (activeCount >= MaxDirectionalLights)
+            if (activeDirCount >= MaxDirectionalLights)
                 break;
             if (!light.IsEnabled())
                 continue;
 
             // 填充GPU结构体数据
-            lightBlock.uDirectionalLights[activeCount].direction = glm::vec4(light.GetDirection(), 0.f);
-            lightBlock.uDirectionalLights[activeCount].colorIntensity = glm::vec4(light.GetColor(), light.GetIntensity());
-            currentVersions[activeCount] = light.GetVersion();
-            ++activeCount;
+            lightBlock.uDirectionalLights[activeDirCount].direction = glm::vec4(light.GetDirection(), 0.f);
+            lightBlock.uDirectionalLights[activeDirCount].colorIntensity = glm::vec4(light.GetColor(), light.GetIntensity());
+            dirVersions[activeDirCount] = light.GetVersion();
+            ++activeDirCount;
         }
+        lightBlock.uLightMeta.x = static_cast<int>(activeDirCount); // 存储有效方向光源数量为x
 
-        lightBlock.uDirectionalLightMeta = glm::ivec4(static_cast<int>(activeCount), 0, 0, 0); // 存储有效方向光源数量为x
+        // 收集有效点光源数据
+        std::array<uint64_t, MaxPointLights> pointVersions{};
+        pointVersions.fill(0u);
+        uint32_t activePointCount = 0u;
+        for (const auto &light : pointLights)
+        {
+            if (activePointCount >= MaxPointLights)
+                break;
+            if (!light.IsEnabled())
+                continue;
+
+            // 填充GPU结构体数据
+            lightBlock.uPointLights[activePointCount].positionRange = glm::vec4(light.GetPosition(), light.GetRange());
+            lightBlock.uPointLights[activePointCount].colorIntensity = glm::vec4(light.GetColor(), light.GetIntensity());
+            lightBlock.uPointLights[activePointCount].attenuation = glm::vec4(light.GetAttenuation(), 0.f);
+            pointVersions[activePointCount] = light.GetVersion();
+            ++activePointCount;
+        }
+        lightBlock.uLightMeta.y = static_cast<int>(activePointCount); // 存储有效点光源数量为y
+
+        // 收集有效聚光灯数据
+        std::array<uint64_t, MaxSpotLights> spotVersions{};
+        spotVersions.fill(0u);
+        uint32_t activeSpotCount = 0u;
+        for (const auto &light : spotLights)
+        {
+            if (activeSpotCount >= MaxSpotLights)
+                break;
+            if (!light.IsEnabled())
+                continue;
+
+            // 填充GPU结构体数据
+            lightBlock.uSpotLights[activeSpotCount].positionRange = glm::vec4(light.GetPosition(), light.GetRange());
+            lightBlock.uSpotLights[activeSpotCount].directionInnerCos = glm::vec4(light.GetDirection(), light.GetInnerCos());
+            lightBlock.uSpotLights[activeSpotCount].colorIntensity = glm::vec4(light.GetColor(), light.GetIntensity());
+            lightBlock.uSpotLights[activeSpotCount].attenuationOuterCos = glm::vec4(light.GetAttenuation(), light.GetOuterCos());
+            spotVersions[activeSpotCount] = light.GetVersion();
+            ++activeSpotCount;
+        }
+        lightBlock.uLightMeta.z = static_cast<int>(activeSpotCount); // 存储有效聚光灯数量为z
 
         // 只有数量和版本发生变化时才上传数据
-        const bool countChanged = (activeCount != mCachedDirectionalCount);
-        const bool versionChanged = (currentVersions != mCachedLightVersions);
-        if (!countChanged && !versionChanged)
+        const bool anyChanged =
+            (activeDirCount != mCachedDirectionalCount) || (dirVersions != mCachedDirectionalVersions) ||
+            (activePointCount != mCachedPointCount) || (pointVersions != mCachedPointVersions) ||
+            (activeSpotCount != mCachedSpotCount) || (spotVersions != mCachedSpotVersions);
+        if (!anyChanged)
             return;
 
         // 上传新数据并更新缓存
         mLightBlockUBO.SetData(static_cast<GLsizeiptr>(sizeof(LightBlockData)), &lightBlock);
-        mCachedDirectionalCount = activeCount;
-        mCachedLightVersions = currentVersions;
+        mCachedDirectionalCount = activeDirCount;
+        mCachedDirectionalVersions = dirVersions;
+        mCachedPointCount = activePointCount;
+        mCachedPointVersions = pointVersions;
+        mCachedSpotCount = activeSpotCount;
+        mCachedSpotVersions = spotVersions;
     }
 
     void RenderBackend::ApplyMaterial(const Material &material, const Shader &shader, RenderProfiler &stats)

@@ -10,7 +10,7 @@ namespace core
 
         backend.BeginRenderTarget(nullptr, true);
         backend.UploadFrameBlock(*ctx.__camera__, ctx.__timeSec__);
-        backend.UploadLightBlock(ctx.__scene__->GetDirectionalLights());
+        backend.UploadLightBlock(ctx.__scene__->GetDirectionalLights(), ctx.__scene__->GetPointLights(), ctx.__scene__->GetSpotLights());
         backend.DrawOpaqueQueue(ctx.__opaqueQueue__, ctx.__stats__);
         backend.EndRenderTarget();
     }

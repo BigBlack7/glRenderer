@@ -82,4 +82,112 @@ namespace core
 
         const glm::vec3 &GetDirection() const noexcept { return mDirection; }
     };
+
+    /*
+        点光源模型:
+        I = I₀ / (kc + k1 * d + k2 * d²)
+        其中I₀为光源强度, d为光源与被照点的距离, kc、k1、k2为衰减系数.
+    */
+    class PointLight final : public Light
+    {
+    private:
+        glm::vec3 mPosition{0.f, 0.f, 0.f}; // 光源位置(世界空间)
+
+        // 默认设置, 其它参数根据点光源的衰减模型进行调整
+        float mRange{100.f};                          // 光源范围(超过此范围光照衰减为0)
+        glm::vec3 mAttenuation{1.f, 0.045f, 0.0075f}; // 衰减系数(常数项kc、一次项k1、二次项k2)
+
+    public:
+        LightType GetType() const noexcept override { return LightType::Point; }
+
+        void SetPosition(const glm::vec3 &position) noexcept
+        {
+            if (glm::length(position - mPosition) <= 1e-6f)
+                return;
+
+            mPosition = position;
+            BumpVersion();
+        }
+
+        const glm::vec3 &GetPosition() const noexcept { return mPosition; }
+        const float GetRange() const noexcept { return mRange; }
+        const glm::vec3 &GetAttenuation() const noexcept { return mAttenuation; }
+    };
+
+    /*
+        聚光灯模型(光照衰减, 角度衰减):
+        I = I₀ * clamp[(cos(θ) - cos(β))/(cos(α) - cos(β)), 0.f, 1.f] / (kc + k1 * d + k2 * d²)
+        其中I₀为光源强度, d为光源与被照点的距离, kc、k1、k2为衰减系数, θ为被照点方向与聚光灯朝向的夹角.
+    */
+    class SpotLight final : public Light
+    {
+    private:
+        glm::vec3 mPosition{0.f, 0.f, 0.f};                                // 光源位置(世界空间)
+        glm::vec3 mDirection{glm::normalize(glm::vec3(-1.f, -1.f, -1.f))}; // 聚光灯朝向(世界空间)
+        float mInnerCos{glm::cos(glm::radians(30.f))};                     // 聚光灯切光角α
+        float mOuterCos{glm::cos(glm::radians(45.f))};                     // 聚光灯外切光角β
+
+        // 默认设置, 其它参数根据聚光灯的衰减模型进行调整
+        float mRange{32.f};                        // 光源范围(超过此范围光照衰减为0)
+        glm::vec3 mAttenuation{1.f, 0.14f, 0.07f}; // 衰减系数(常数项kc、一次项k1、二次项k2)
+    public:
+        LightType GetType() const noexcept override { return LightType::Spot; }
+
+        void SetPosition(const glm::vec3 &position) noexcept
+        {
+            if (glm::length(position - mPosition) <= 1e-6f)
+                return;
+
+            mPosition = position;
+            BumpVersion();
+        }
+
+        const glm::vec3 &GetPosition() const noexcept { return mPosition; }
+
+        void SetDirection(const glm::vec3 &direction) noexcept
+        {
+            if (glm::length(direction) <= 1e-6f)
+                return;
+
+            const glm::vec3 nd = glm::normalize(direction);
+            if (glm::length(nd - mDirection) <= 1e-6f)
+                return;
+
+            mDirection = nd;
+            BumpVersion();
+        }
+
+        const glm::vec3 &GetDirection() const noexcept { return mDirection; }
+
+        void SetInnerAngle(float inner) noexcept
+        {
+            // [0°, 90°]范围
+            inner = glm::max(90.f, glm::min(0.f, inner));
+            float innerCos = glm::cos(glm::radians(inner));
+            if (std::abs(mInnerCos - innerCos) <= 1e-6f)
+                return;
+
+            mInnerCos = innerCos;
+            BumpVersion();
+        }
+
+        float GetInnerCos() const noexcept { return mInnerCos; }
+
+        void SetOuterAngle(float outer) noexcept
+        {
+            // [0°, 90°]范围, 且外切光角必须大于内切光角
+            float inner = glm::degrees(glm::acos(mInnerCos));
+            outer = std::max(90.f, std::min(inner + 10.f, outer));
+            float outerCos = glm::cos(glm::radians(outer));
+            if (std::abs(mOuterCos - outerCos) <= 1e-6f)
+                return;
+
+            mOuterCos = outerCos;
+            BumpVersion();
+        }
+
+        float GetOuterCos() const noexcept { return mOuterCos; }
+        const float GetRange() const noexcept { return mRange; }
+        const glm::vec3 &GetAttenuation() const noexcept { return mAttenuation; }
+    };
 }

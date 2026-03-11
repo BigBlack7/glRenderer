@@ -29,6 +29,8 @@ namespace core
         bool mRootsDirty{true};             // 根缓存是否需要重建
 
         std::vector<DirectionalLight> mDirectionalLights{};
+        std::vector<PointLight> mPointLights{};
+        std::vector<SpotLight> mSpotLights{};
 
     private:
         /// @brief 检查实体ID是否有效
@@ -117,16 +119,17 @@ namespace core
         /// @return 世界法线矩阵的常量引用
         [[nodiscard]] const glm::mat3 &GetWorldNormalMatrix(EntityID id) const noexcept;
 
-        /// @brief 添加一个定向光源到场景中
-        /// @param light 定向光源对象
         void AddDirectionalLight(const DirectionalLight &light);
-
-        /// @brief 清除场景中的所有定向光源
         void ClearDirectionalLights();
-
-        /// @brief 获取场景中的所有定向光源
-        /// @return 定向光源列表的span视图
         [[nodiscard]] std::span<const DirectionalLight> GetDirectionalLights() const noexcept { return mDirectionalLights; }
+
+        void AddPointLight(const PointLight &light);
+        void ClearPointLights();
+        [[nodiscard]] std::span<const PointLight> GetPointLights() const noexcept { return mPointLights; }
+
+        void AddSpotLight(const SpotLight &light);
+        void ClearSpotLights(); 
+        [[nodiscard]] std::span<const SpotLight> GetSpotLights() const noexcept { return mSpotLights; }
 
         /// @brief 遍历所有可渲染实体
         /// @tparam Fn 函数对象类型, 必须接受(EntityID, const Entity &, const glm::mat4 &, const glm::mat3 &)作为参数

@@ -243,4 +243,24 @@ namespace core
     {
         mDirectionalLights.clear();
     }
+
+    void Scene::AddPointLight(const PointLight &light)
+    {
+        mPointLights.push_back(light);
+    }
+
+    void Scene::ClearPointLights()
+    {
+        mPointLights.clear();
+    }
+
+    void Scene::AddSpotLight(const SpotLight &light)
+    {
+        mSpotLights.push_back(light);
+    }
+
+    void Scene::ClearSpotLights()
+    {
+        mSpotLights.clear();
+    }
 }

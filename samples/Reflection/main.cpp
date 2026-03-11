@@ -23,11 +23,11 @@ std::unique_ptr<core::CameraController> controller = nullptr;
 std::shared_ptr<core::Shader> phongShader = nullptr;
 
 std::unique_ptr<core::Scene> scene = nullptr;
-core::EntityID earthID = core::InvalidEntityID;
+core::EntityID boxID = core::InvalidEntityID;
 core::EntityID moonID = core::InvalidEntityID;
 core::EntityID sunID = core::InvalidEntityID;
 
-void BuildDirectionalLights()
+void BuildLights()
 {
     if (!scene)
         return;
@@ -71,17 +71,17 @@ void ScenePrepare()
     auto sphere = core::Mesh::CreateSphere(1.f);
 
     /* 材质处理阶段 */
-    auto earthTex = std::make_shared<core::Texture>("earth.jpg", 0);
+    auto earthTex = std::make_shared<core::Texture>("planet/earth.jpg", 0);
     earthMaterial->SetTexture(core::TextureSlot::Albedo, earthTex);
     earthMaterial->SetVec3("uDefaultColor", glm::vec3(1.f, 1.f, 1.f));
     earthMaterial->SetFloat("uShininess", 64.f);
 
-    auto moonTex = std::make_shared<core::Texture>("moon.jpg", 0);
+    auto moonTex = std::make_shared<core::Texture>("planet/moon.jpg", 0);
     moonMaterial->SetTexture(core::TextureSlot::Albedo, moonTex);
     moonMaterial->SetVec3("uDefaultColor", glm::vec3(0.23f, 0.43f, 0.82f));
     moonMaterial->SetFloat("uShininess", 32.f);
 
-    auto sunTex = std::make_shared<core::Texture>("sun.jpg", 0);
+    auto sunTex = std::make_shared<core::Texture>("planet/sun.jpg", 0);
     sunMaterial->SetTexture(core::TextureSlot::Albedo, sunTex);
     sunMaterial->SetVec3("uDefaultColor", glm::vec3(0.67f, 0.21f, 0.45f));
     sunMaterial->SetFloat("uShininess", 16.f);
@@ -98,8 +98,8 @@ void ScenePrepare()
         s->GetTransform().SetScale(glm::vec3(1.f));
     }
 
-    earthID = scene->CreateEntity("Earth");
-    if (auto *e = scene->GetEntity(earthID))
+    boxID = scene->CreateEntity("Earth");
+    if (auto *e = scene->GetEntity(boxID))
     {
         e->SetMesh(sphere);
         e->SetMaterial(earthMaterial);
@@ -116,18 +116,18 @@ void ScenePrepare()
         m->GetTransform().SetScale(glm::vec3(0.1f));
     }
 
-    scene->Reparent(earthID, sunID);  // 地球挂到太阳
-    scene->Reparent(moonID, earthID); // 月亮挂到地球
+    scene->Reparent(boxID, sunID);  // 地球挂到太阳
+    scene->Reparent(moonID, boxID); // 月亮挂到地球
 
     /* 光源设置阶段 */
-    BuildDirectionalLights();
+    BuildLights();
 }
 
 void render()
 {
     float time = static_cast<float>(glfwGetTime());
 
-    if (auto *e = scene->GetEntity(earthID))
+    if (auto *e = scene->GetEntity(boxID))
         e->GetTransform().SetEulerXyzRad(glm::vec3(0.f, time * 2.f, 0.f));
 
     if (auto *m = scene->GetEntity(moonID))
@@ -186,7 +186,7 @@ int main()
         ImGui::Begin("Settings");
         ImGui::ColorEdit3("Clear Color", glm::value_ptr(clearColor));
         ImGui::End();
-        
+
         renderer->SetClearColor(clearColor);
         render();
 
@@ -204,4 +204,3 @@ int main()
     core::Logger::Shutdown();
     return 0;
 }
-// (重要前提: 我目前在实现一个OpenGL的个人渲染器用来作为简历找工作的项目, 不需要像商业级引擎一样复杂, 只需要项目结构清晰明了, 实现高效且优雅, 符合现代工程实践。)

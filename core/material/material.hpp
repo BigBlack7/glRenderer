@@ -20,6 +20,7 @@ namespace core
         AO,
         Emissive,
         OpacityMask,
+        SpecularMask,
         Count // 纹理槽数量
     };
 
@@ -37,7 +38,8 @@ namespace core
             "uMetallicRoughSampler", // MetallicRoughness
             "uAOSampler",            // AO
             "uEmissiveSampler",      // Emissive
-            "uOpacitySampler"        // OpacityMask
+            "uOpacitySampler",        // OpacityMask
+            "uSpecularMaskSampler"   // SpecularMask
         };
 
         // 材质特性位掩码

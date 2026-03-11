@@ -29,9 +29,13 @@ namespace core
 
         RenderStateCache mStateCache{}; // 状态缓存避免冗余的OpenGL状态切换
 
-        uint32_t mCachedDirectionalCount{std::numeric_limits<uint32_t>::max()}; // 缓存的定向光数量
-        std::array<uint64_t, MaxDirectionalLights> mCachedLightVersions{};      // 各光源的版本号缓存
-        std::unordered_set<GLuint> mProgramBlockBoundCache{};                   // 已绑定UBO的着色器程序缓存
+        uint32_t mCachedDirectionalCount{std::numeric_limits<uint32_t>::max()};  // 缓存的定向光数量
+        std::array<uint64_t, MaxDirectionalLights> mCachedDirectionalVersions{}; // 平行光源的版本号缓存
+        uint32_t mCachedPointCount{std::numeric_limits<uint32_t>::max()};        // 缓存的点光源数量
+        std::array<uint64_t, MaxPointLights> mCachedPointVersions{};             // 点光源的版本号缓存
+        uint32_t mCachedSpotCount{std::numeric_limits<uint32_t>::max()};         // 缓存的聚光灯数量
+        std::array<uint64_t, MaxSpotLights> mCachedSpotVersions{};               // 聚光灯的版本号缓存
+        std::unordered_set<GLuint> mProgramBlockBoundCache{};                    // 已绑定UBO的着色器程序缓存
 
         bool mInitialized{false};
         glm::vec4 mClearColor{};
@@ -80,7 +84,11 @@ namespace core
 
         /// @brief 上传光照数据到UBO
         /// @param directionalLights 定向光源数组
-        void UploadLightBlock(std::span<const DirectionalLight> directionalLights);
+        /// @param pointLights 点光源数组
+        /// @param spotLights 聚光光源数组
+        void UploadLightBlock(std::span<const DirectionalLight> directionalLights,
+                              std::span<const PointLight> pointLights,
+                              std::span<const SpotLight> spotLights);
 
         /// @brief 绘制不透明物体队列
         /// @param queue 渲染队列
