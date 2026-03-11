@@ -86,6 +86,33 @@ namespace core
         }
     }
 
+    void Scene::RebuildLightUploadCache() const
+    {
+        mDirectionalUploadCache.clear();
+        mDirectionalUploadCache.reserve(mDirectionalLights.size());
+        for (const auto &light : mDirectionalLights)
+        {
+            if (light.has_value())
+                mDirectionalUploadCache.push_back(light.value());
+        }
+
+        mPointUploadCache.clear();
+        mPointUploadCache.reserve(mPointLights.size());
+        for (const auto &light : mPointLights)
+        {
+            if (light.has_value())
+                mPointUploadCache.push_back(light.value());
+        }
+
+        mSpotUploadCache.clear();
+        mSpotUploadCache.reserve(mSpotLights.size());
+        for (const auto &light : mSpotLights)
+        {
+            if (light.has_value())
+                mSpotUploadCache.push_back(light.value());
+        }
+    }
+
     EntityID Scene::CreateEntity(std::string name)
     {
         EntityID id = InvalidEntityID;
@@ -234,33 +261,173 @@ namespace core
         return mNodes[id].__worldNormalMatrix__;
     }
 
+    // ===========================灯光相关接口实现===========================
+    LightID Scene::CreateDirectionalLight(const DirectionalLight &light)
+    {
+        // 优先重用空闲ID以提高性能
+        if (!mFreeDirectionalLightIDs.empty())
+        {
+            const LightID id = mFreeDirectionalLightIDs.back();
+            mFreeDirectionalLightIDs.pop_back();
+            mDirectionalLights[id] = light;
+            return id;
+        }
+
+        // 无空闲ID时, 扩展容器以容纳新光源
+        const LightID id = static_cast<LightID>(mDirectionalLights.size());
+        mDirectionalLights.emplace_back(light);
+        return id;
+    }
+
+    bool Scene::RemoveDirectionalLight(LightID id)
+    {
+        // 无效id不处理
+        if (!IsValidLightID(id, mDirectionalLights))
+            return false;
+
+        mDirectionalLights[id].reset();
+        mFreeDirectionalLightIDs.push_back(id);
+        return true;
+    }
+
+    DirectionalLight *Scene::GetDirectionalLight(LightID id) noexcept
+    {
+        if (!IsValidLightID(id, mDirectionalLights))
+            return nullptr;
+        return &mDirectionalLights[id].value();
+    }
+
+    const DirectionalLight *Scene::GetDirectionalLight(LightID id) const noexcept
+    {
+        if (!IsValidLightID(id, mDirectionalLights))
+            return nullptr;
+        return &mDirectionalLights[id].value();
+    }
+
     void Scene::AddDirectionalLight(const DirectionalLight &light)
     {
-        mDirectionalLights.push_back(light);
+        // 直接创建光源, 无需检查是否已存在(兼容旧版接口, 后续移除)
+        (void)CreateDirectionalLight(light);
+    }
+
+    std::span<const DirectionalLight> Scene::GetDirectionalLights() const noexcept
+    {
+        RebuildLightUploadCache();
+        return mDirectionalUploadCache;
     }
 
     void Scene::ClearDirectionalLights()
     {
-        mDirectionalLights.clear();
+        mFreeDirectionalLightIDs.clear();
+    }
+
+    LightID Scene::CreatePointLight(const PointLight &light)
+    {
+        if (!mFreePointLightIDs.empty())
+        {
+            const LightID id = mFreePointLightIDs.back();
+            mFreePointLightIDs.pop_back();
+            mPointLights[id] = light;
+            return id;
+        }
+
+        const LightID id = static_cast<LightID>(mPointLights.size());
+        mPointLights.emplace_back(light);
+        return id;
+    }
+
+    bool Scene::RemovePointLight(LightID id)
+    {
+        if (!IsValidLightID(id, mPointLights))
+            return false;
+
+        mPointLights[id].reset();
+        mFreePointLightIDs.push_back(id);
+        return true;
+    }
+
+    PointLight *Scene::GetPointLight(LightID id) noexcept
+    {
+        if (!IsValidLightID(id, mPointLights))
+            return nullptr;
+        return &mPointLights[id].value();
+    }
+
+    const PointLight *Scene::GetPointLight(LightID id) const noexcept
+    {
+        if (!IsValidLightID(id, mPointLights))
+            return nullptr;
+        return &mPointLights[id].value();
     }
 
     void Scene::AddPointLight(const PointLight &light)
     {
-        mPointLights.push_back(light);
+        (void)CreatePointLight(light);
+    }
+
+    std::span<const PointLight> Scene::GetPointLights() const noexcept
+    {
+        RebuildLightUploadCache();
+        return mPointUploadCache;
     }
 
     void Scene::ClearPointLights()
     {
-        mPointLights.clear();
+        mFreePointLightIDs.clear();
+    }
+
+    LightID Scene::CreateSpotLight(const SpotLight &light)
+    {
+        if (!mFreeSpotLightIDs.empty())
+        {
+            const LightID id = mFreeSpotLightIDs.back();
+            mFreeSpotLightIDs.pop_back();
+            mSpotLights[id] = light;
+            return id;
+        }
+
+        const LightID id = static_cast<LightID>(mSpotLights.size());
+        mSpotLights.emplace_back(light);
+        return id;
+    }
+
+    bool Scene::RemoveSpotLight(LightID id)
+    {
+        if (!IsValidLightID(id, mSpotLights))
+            return false;
+
+        mSpotLights[id].reset();
+        mFreeSpotLightIDs.push_back(id);
+        return true;
+    }
+
+    SpotLight *Scene::GetSpotLight(LightID id) noexcept
+    {
+        if (!IsValidLightID(id, mSpotLights))
+            return nullptr;
+        return &mSpotLights[id].value();
+    }
+
+    const SpotLight *Scene::GetSpotLight(LightID id) const noexcept
+    {
+        if (!IsValidLightID(id, mSpotLights))
+            return nullptr;
+        return &mSpotLights[id].value();
     }
 
     void Scene::AddSpotLight(const SpotLight &light)
     {
-        mSpotLights.push_back(light);
+        (void)CreateSpotLight(light);
+    }
+
+    std::span<const SpotLight> Scene::GetSpotLights() const noexcept
+    {
+        RebuildLightUploadCache();
+        return mSpotUploadCache;
     }
 
     void Scene::ClearSpotLights()
     {
-        mSpotLights.clear();
+        mFreeSpotLightIDs.clear();
     }
 }

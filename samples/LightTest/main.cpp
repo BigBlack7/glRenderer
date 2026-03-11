@@ -20,33 +20,93 @@ std::shared_ptr<core::Shader> phongShader = nullptr;
 std::unique_ptr<core::Scene> scene = nullptr;
 core::EntityID boxID = core::InvalidEntityID;
 
+// 光源ID管理
+core::LightID mainDirLightID = core::InvalidLightID;
+core::LightID pointLightID = core::InvalidLightID;
+core::LightID spotLightID = core::InvalidLightID;
+
 void BuildLights()
 {
     if (!scene)
         return;
 
-    scene->ClearDirectionalLights();
+    // 清除旧光源
+    if (mainDirLightID != core::InvalidLightID)
+        scene->RemoveDirectionalLight(mainDirLightID);
+    if (pointLightID != core::InvalidLightID)
+        scene->RemovePointLight(pointLightID);
+    if (spotLightID != core::InvalidLightID)
+        scene->RemoveSpotLight(spotLightID);
 
+    // 创建定向光
     core::DirectionalLight mainLight;
     mainLight.SetDirection(glm::vec3(0.f, 0.f, -1.f));
     mainLight.SetColor(glm::vec3(1.f, 1.f, 1.f));
     mainLight.SetIntensity(0.9f);
-    scene->AddDirectionalLight(mainLight);
+    mainDirLightID = scene->CreateDirectionalLight(mainLight);
 
-    scene->ClearPointLights();
+    // 创建点光源
     core::PointLight pointLight;
     pointLight.SetPosition(glm::vec3(-20.f, 0.f, 0.f));
     pointLight.SetColor(glm::vec3(1.f, 1.f, 1.f));
     pointLight.SetIntensity(0.9f);
-    scene->AddPointLight(pointLight);
+    pointLightID = scene->CreatePointLight(pointLight);
 
-    scene->ClearSpotLights();
+    // 创建聚光灯
     core::SpotLight spotLight;
     spotLight.SetPosition(glm::vec3(1.f, 0.f, 0.f));
     spotLight.SetDirection(glm::vec3(-1.f, 0.f, 0.f));
     spotLight.SetColor(glm::vec3(1.f, 1.f, 1.f));
     spotLight.SetIntensity(0.9f);
-    scene->AddSpotLight(spotLight);
+    spotLightID = scene->CreateSpotLight(spotLight);
+}
+
+void UpdateLights(float time)
+{
+    if (!scene)
+        return;
+    // 动态更新点光源位置 - 圆形运动
+    if (auto *pointLight = scene->GetPointLight(pointLightID))
+    {
+        float radius = 15.f;
+        float speed = 0.5f;
+        glm::vec3 newPos(
+            radius * glm::cos(time * speed),
+            5.f,
+            radius * glm::sin(time * speed));
+        pointLight->SetPosition(newPos);
+
+        // 根据位置调整颜色
+        glm::vec3 color = glm::mix(
+            glm::vec3(1.f, 0.5f, 0.2f), // 暖色
+            glm::vec3(0.2f, 0.5f, 1.f), // 冷色
+            (glm::sin(time * speed * 2.f) + 1.f) * 0.5f);
+        pointLight->SetColor(color);
+    }
+    // 动态更新聚光灯方向 - 摆动
+    if (auto *spotLight = scene->GetSpotLight(spotLightID))
+    {
+        float angle = time * 0.8f;
+        glm::vec3 newDir(
+            glm::cos(angle),
+            -0.5f,
+            glm::sin(angle));
+        spotLight->SetDirection(glm::normalize(newDir));
+
+        // 根据时间调整强度
+        float intensity = 0.7f + 0.3f * glm::sin(time * 2.f);
+        spotLight->SetIntensity(intensity);
+    }
+    // 动态更新定向光方向 - 缓慢旋转
+    if (auto *dirLight = scene->GetDirectionalLight(mainDirLightID))
+    {
+        float angle = time * 0.1f;
+        glm::vec3 newDir(
+            glm::cos(angle) * 0.7f,
+            -0.7f,
+            glm::sin(angle) * 0.7f);
+        dirLight->SetDirection(glm::normalize(newDir));
+    }
 }
 
 void ScenePrepare()
@@ -84,11 +144,10 @@ void render()
 {
     float time = static_cast<float>(glfwGetTime());
 
-    if (auto *e = scene->GetEntity(boxID))
-        // e->GetTransform().SetEulerXyzRad(glm::vec3(0.f, time * 2.f, 0.f));
+    // UpdateLights(time);
 
-        if (renderer && scene && camera)
-            renderer->Render(*scene, *camera, time);
+    if (renderer && scene && camera)
+        renderer->Render(*scene, *camera, time);
 }
 
 int main()

@@ -10,6 +10,9 @@
 
 namespace core
 {
+    using LightID = uint32_t;
+    constexpr LightID InvalidLightID = std::numeric_limits<LightID>::max();
+
     class Scene final
     {
     private:
@@ -28,9 +31,18 @@ namespace core
         std::vector<EntityID> mRootCache{}; // 缓存所有根实体
         bool mRootsDirty{true};             // 根缓存是否需要重建
 
-        std::vector<DirectionalLight> mDirectionalLights{};
-        std::vector<PointLight> mPointLights{};
-        std::vector<SpotLight> mSpotLights{};
+        //=====================================灯光系统=================================================
+        std::vector<std::optional<DirectionalLight>> mDirectionalLights{};
+        std::vector<std::optional<PointLight>> mPointLights{};
+        std::vector<std::optional<SpotLight>> mSpotLights{};
+
+        std::vector<LightID> mFreeDirectionalLightIDs{};
+        std::vector<LightID> mFreePointLightIDs{};
+        std::vector<LightID> mFreeSpotLightIDs{};
+
+        mutable std::vector<DirectionalLight> mDirectionalUploadCache{};
+        mutable std::vector<PointLight> mPointUploadCache{};
+        mutable std::vector<SpotLight> mSpotUploadCache{};
 
     private:
         /// @brief 检查实体ID是否有效
@@ -51,6 +63,20 @@ namespace core
         /// @param id 当前节点ID
         /// @param parentWorld 父节点的世界变换矩阵
         void UpdateNodeRecursive(EntityID id, const glm::mat4 &parentWorld);
+
+        /// @brief 检查灯光ID是否有效
+        /// @tparam T 灯光类型
+        /// @param id 灯光ID
+        /// @param lights 灯光存储池
+        /// @return 是否有效
+        template <typename T>
+        [[nodiscard]] bool IsValidLightID(LightID id, const std::vector<std::optional<T>> &lights) const noexcept
+        {
+            return id < static_cast<LightID>(lights.size()) && lights[id].has_value();
+        }
+
+        /// @brief 重建灯光上传缓存, 需要在灯光数据修改后调用以确保GPU数据正确
+        void RebuildLightUploadCache() const;
 
     public:
         Scene() = default;
@@ -119,17 +145,33 @@ namespace core
         /// @return 世界法线矩阵的常量引用
         [[nodiscard]] const glm::mat3 &GetWorldNormalMatrix(EntityID id) const noexcept;
 
+        //=====================================灯光系统=================================================
+
+        [[nodiscard]] LightID CreateDirectionalLight(const DirectionalLight &light = {});
+        bool RemoveDirectionalLight(LightID id);
+        [[nodiscard]] DirectionalLight *GetDirectionalLight(LightID id) noexcept;
+        [[nodiscard]] const DirectionalLight *GetDirectionalLight(LightID id) const noexcept;
         void AddDirectionalLight(const DirectionalLight &light);
+        [[nodiscard]] std::span<const DirectionalLight> GetDirectionalLights() const noexcept;
         void ClearDirectionalLights();
-        [[nodiscard]] std::span<const DirectionalLight> GetDirectionalLights() const noexcept { return mDirectionalLights; }
 
+        [[nodiscard]] LightID CreatePointLight(const PointLight &light = {});
+        bool RemovePointLight(LightID id);
+        [[nodiscard]] PointLight *GetPointLight(LightID id) noexcept;
+        [[nodiscard]] const PointLight *GetPointLight(LightID id) const noexcept;
         void AddPointLight(const PointLight &light);
+        [[nodiscard]] std::span<const PointLight> GetPointLights() const noexcept;
         void ClearPointLights();
-        [[nodiscard]] std::span<const PointLight> GetPointLights() const noexcept { return mPointLights; }
 
+        [[nodiscard]] LightID CreateSpotLight(const SpotLight &light = {});
+        bool RemoveSpotLight(LightID id);
+        [[nodiscard]] SpotLight *GetSpotLight(LightID id) noexcept;
+        [[nodiscard]] const SpotLight *GetSpotLight(LightID id) const noexcept;
         void AddSpotLight(const SpotLight &light);
-        void ClearSpotLights(); 
-        [[nodiscard]] std::span<const SpotLight> GetSpotLights() const noexcept { return mSpotLights; }
+        [[nodiscard]] std::span<const SpotLight> GetSpotLights() const noexcept;
+        void ClearSpotLights();
+
+        //=====================================灯光系统=================================================
 
         /// @brief 遍历所有可渲染实体
         /// @tparam Fn 函数对象类型, 必须接受(EntityID, const Entity &, const glm::mat4 &, const glm::mat3 &)作为参数

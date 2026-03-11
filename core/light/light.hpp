@@ -108,9 +108,28 @@ namespace core
             mPosition = position;
             BumpVersion();
         }
-
         const glm::vec3 &GetPosition() const noexcept { return mPosition; }
+
+        void SetRange(float range) noexcept
+        {
+            range = std::max(0.f, range);
+            if (std::abs(mRange - range) <= 1e-6f)
+                return;
+
+            mRange = range;
+            BumpVersion();
+        }
         const float GetRange() const noexcept { return mRange; }
+
+        void SetAttenuation(const glm::vec3 &attenuation) noexcept
+        {
+            glm::vec3 safe = glm::max(attenuation, glm::vec3(0.f));
+            if (glm::length(safe - mAttenuation) <= 1e-6f)
+                return;
+
+            mAttenuation = safe;
+            BumpVersion();
+        }
         const glm::vec3 &GetAttenuation() const noexcept { return mAttenuation; }
     };
 
@@ -162,7 +181,7 @@ namespace core
         void SetInnerAngle(float inner) noexcept
         {
             // [0°, 90°]范围
-            inner = glm::max(90.f, glm::min(0.f, inner));
+            inner = glm::clamp(inner, 0.f, 90.f);
             float innerCos = glm::cos(glm::radians(inner));
             if (std::abs(mInnerCos - innerCos) <= 1e-6f)
                 return;
@@ -177,7 +196,7 @@ namespace core
         {
             // [0°, 90°]范围, 且外切光角必须大于内切光角
             float inner = glm::degrees(glm::acos(mInnerCos));
-            outer = std::max(90.f, std::min(inner + 10.f, outer));
+            outer = glm::clamp(outer, inner + 10.f, 90.f);
             float outerCos = glm::cos(glm::radians(outer));
             if (std::abs(mOuterCos - outerCos) <= 1e-6f)
                 return;
@@ -185,9 +204,28 @@ namespace core
             mOuterCos = outerCos;
             BumpVersion();
         }
-
         float GetOuterCos() const noexcept { return mOuterCos; }
+
+        void SetRange(float range) noexcept
+        {
+            range = std::max(0.f, range);
+            if (std::abs(mRange - range) <= 1e-6f)
+                return;
+
+            mRange = range;
+            BumpVersion();
+        }
         const float GetRange() const noexcept { return mRange; }
+
+        void SetAttenuation(const glm::vec3 &attenuation) noexcept
+        {
+            glm::vec3 safe = glm::max(attenuation, glm::vec3(0.f));
+            if (glm::length(safe - mAttenuation) <= 1e-6f)
+                return;
+
+            mAttenuation = safe;
+            BumpVersion();
+        }
         const glm::vec3 &GetAttenuation() const noexcept { return mAttenuation; }
     };
 }
