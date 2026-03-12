@@ -1,6 +1,6 @@
 ﻿#pragma once
 #include "entity.hpp"
-#include "light/light.hpp"
+#include "light/lightManager.hpp"
 #include <glm/glm.hpp>
 #include <optional>
 #include <span>
@@ -10,9 +10,6 @@
 
 namespace core
 {
-    using LightID = uint32_t;
-    constexpr LightID InvalidLightID = std::numeric_limits<LightID>::max();
-
     class Scene final
     {
     private:
@@ -31,18 +28,7 @@ namespace core
         std::vector<EntityID> mRootCache{}; // 缓存所有根实体
         bool mRootsDirty{true};             // 根缓存是否需要重建
 
-        //=====================================灯光系统=================================================
-        std::vector<std::optional<DirectionalLight>> mDirectionalLights{};
-        std::vector<std::optional<PointLight>> mPointLights{};
-        std::vector<std::optional<SpotLight>> mSpotLights{};
-
-        std::vector<LightID> mFreeDirectionalLightIDs{};
-        std::vector<LightID> mFreePointLightIDs{};
-        std::vector<LightID> mFreeSpotLightIDs{};
-
-        mutable std::vector<DirectionalLight> mDirectionalUploadCache{};
-        mutable std::vector<PointLight> mPointUploadCache{};
-        mutable std::vector<SpotLight> mSpotUploadCache{};
+        class LightManager mLightManager{};
 
     private:
         /// @brief 检查实体ID是否有效
@@ -63,20 +49,6 @@ namespace core
         /// @param id 当前节点ID
         /// @param parentWorld 父节点的世界变换矩阵
         void UpdateNodeRecursive(EntityID id, const glm::mat4 &parentWorld);
-
-        /// @brief 检查灯光ID是否有效
-        /// @tparam T 灯光类型
-        /// @param id 灯光ID
-        /// @param lights 灯光存储池
-        /// @return 是否有效
-        template <typename T>
-        [[nodiscard]] bool IsValidLightID(LightID id, const std::vector<std::optional<T>> &lights) const noexcept
-        {
-            return id < static_cast<LightID>(lights.size()) && lights[id].has_value();
-        }
-
-        /// @brief 重建灯光上传缓存, 需要在灯光数据修改后调用以确保GPU数据正确
-        void RebuildLightUploadCache() const;
 
     public:
         Scene() = default;
@@ -147,29 +119,35 @@ namespace core
 
         //=====================================灯光系统=================================================
 
-        [[nodiscard]] LightID CreateDirectionalLight(const DirectionalLight &light = {});
-        bool RemoveDirectionalLight(LightID id);
-        [[nodiscard]] DirectionalLight *GetDirectionalLight(LightID id) noexcept;
-        [[nodiscard]] const DirectionalLight *GetDirectionalLight(LightID id) const noexcept;
-        void AddDirectionalLight(const DirectionalLight &light);
-        [[nodiscard]] std::span<const DirectionalLight> GetDirectionalLights() const noexcept;
-        void ClearDirectionalLights();
+        /// @brief 获取灯光管理器，用于创建和管理光源
+        /// @return 灯光管理器引用
+        [[nodiscard]] class LightManager &GetLightManager() noexcept { return mLightManager; }
 
-        [[nodiscard]] LightID CreatePointLight(const PointLight &light = {});
-        bool RemovePointLight(LightID id);
-        [[nodiscard]] PointLight *GetPointLight(LightID id) noexcept;
-        [[nodiscard]] const PointLight *GetPointLight(LightID id) const noexcept;
-        void AddPointLight(const PointLight &light);
-        [[nodiscard]] std::span<const PointLight> GetPointLights() const noexcept;
-        void ClearPointLights();
+        /// @brief 获取灯光管理器，用于创建和管理光源
+        /// @return 灯光管理器常量引用
+        [[nodiscard]] const class LightManager &GetLightManager() const noexcept { return mLightManager; }
 
-        [[nodiscard]] LightID CreateSpotLight(const SpotLight &light = {});
-        bool RemoveSpotLight(LightID id);
-        [[nodiscard]] SpotLight *GetSpotLight(LightID id) noexcept;
-        [[nodiscard]] const SpotLight *GetSpotLight(LightID id) const noexcept;
-        void AddSpotLight(const SpotLight &light);
-        [[nodiscard]] std::span<const SpotLight> GetSpotLights() const noexcept;
-        void ClearSpotLights();
+        // 兼容层
+        [[nodiscard]] LightID CreateDirectionalLight(const DirectionalLight &light = {}) { return mLightManager.CreateLight(light); }
+        bool RemoveDirectionalLight(LightID id) { return mLightManager.RemoveLight<DirectionalLight>(id); }
+        [[nodiscard]] DirectionalLight *GetDirectionalLight(LightID id) noexcept { return mLightManager.GetLight<DirectionalLight>(id); }
+        [[nodiscard]] const DirectionalLight *GetDirectionalLight(LightID id) const noexcept { return mLightManager.GetLight<DirectionalLight>(id); }
+        [[nodiscard]] std::span<const DirectionalLight> GetDirectionalLights() const noexcept { return mLightManager.GetLights<DirectionalLight>(); }
+        void ClearDirectionalLights() { mLightManager.ClearLights<DirectionalLight>(); }
+
+        [[nodiscard]] LightID CreatePointLight(const PointLight &light = {}) { return mLightManager.CreateLight(light); }
+        bool RemovePointLight(LightID id) { return mLightManager.RemoveLight<PointLight>(id); }
+        [[nodiscard]] PointLight *GetPointLight(LightID id) noexcept { return mLightManager.GetLight<PointLight>(id); }
+        [[nodiscard]] const PointLight *GetPointLight(LightID id) const noexcept { return mLightManager.GetLight<PointLight>(id); }
+        [[nodiscard]] std::span<const PointLight> GetPointLights() const noexcept { return mLightManager.GetLights<PointLight>(); }
+        void ClearPointLights() { mLightManager.ClearLights<PointLight>(); }
+
+        [[nodiscard]] LightID CreateSpotLight(const SpotLight &light = {}) { return mLightManager.CreateLight(light); }
+        bool RemoveSpotLight(LightID id) { return mLightManager.RemoveLight<SpotLight>(id); }
+        [[nodiscard]] SpotLight *GetSpotLight(LightID id) noexcept { return mLightManager.GetLight<SpotLight>(id); }
+        [[nodiscard]] const SpotLight *GetSpotLight(LightID id) const noexcept { return mLightManager.GetLight<SpotLight>(id); }
+        [[nodiscard]] std::span<const SpotLight> GetSpotLights() const noexcept { return mLightManager.GetLights<SpotLight>(); }
+        void ClearSpotLights() { return mLightManager.ClearLights<SpotLight>(); }
 
         //=====================================灯光系统=================================================
 

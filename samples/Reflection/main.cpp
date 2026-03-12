@@ -12,11 +12,6 @@
 #include <texture/texture.hpp>
 #include <utils/logger.hpp>
 
-#include <imgui.h>
-#include <imgui_impl_glfw.h>
-#include <imgui_impl_opengl3.h>
-#include <glm/gtc/type_ptr.hpp>
-
 std::unique_ptr<core::Renderer> renderer = nullptr;
 std::shared_ptr<core::Camera> camera = nullptr;
 std::unique_ptr<core::CameraController> controller = nullptr;
@@ -26,6 +21,12 @@ std::unique_ptr<core::Scene> scene = nullptr;
 core::EntityID boxID = core::InvalidEntityID;
 core::EntityID moonID = core::InvalidEntityID;
 core::EntityID sunID = core::InvalidEntityID;
+
+// 光源ID
+core::LightID mainDirLightID = core::InvalidLightID;
+core::LightID fillDirLightID = core::InvalidLightID;
+core::LightID backDirLightID = core::InvalidLightID;
+core::LightID topDirLightID = core::InvalidLightID;
 
 void BuildLights()
 {
@@ -38,25 +39,25 @@ void BuildLights()
     mainLight.SetDirection(glm::vec3(-1.f, -1.f, 0.5f));
     mainLight.SetColor(glm::vec3(1.f, 0.2f, 0.2f));
     mainLight.SetIntensity(0.8f);
-    scene->AddDirectionalLight(mainLight);
+    mainDirLightID = scene->CreateDirectionalLight(mainLight);
 
     core::DirectionalLight fillLight;
     fillLight.SetDirection(glm::vec3(0.8f, -0.6f, 0.5f));
     fillLight.SetColor(glm::vec3(0.2f, 1.f, 0.2f));
     fillLight.SetIntensity(0.6f);
-    scene->AddDirectionalLight(fillLight);
+    fillDirLightID = scene->CreateDirectionalLight(fillLight);
 
     core::DirectionalLight backLight;
     backLight.SetDirection(glm::vec3(0.f, -0.5f, -1.f));
     backLight.SetColor(glm::vec3(0.2f, 0.2f, 1.f));
     backLight.SetIntensity(0.4f);
-    scene->AddDirectionalLight(backLight);
+    backDirLightID = scene->CreateDirectionalLight(backLight);
 
     core::DirectionalLight topLight;
     topLight.SetDirection(glm::vec3(0.f, -1.f, 0.f));
     topLight.SetColor(glm::vec3(1.f, 1.f, 0.2f));
     topLight.SetIntensity(0.3f);
-    scene->AddDirectionalLight(topLight);
+    topDirLightID = scene->CreateDirectionalLight(topLight);
 }
 
 void ScenePrepare()
@@ -140,18 +141,6 @@ void render()
         renderer->Render(*scene, *camera, time);
 }
 
-glm::vec4 clearColor{0.68f, 0.85f, 0.90f, 1.f};
-
-void initIMGUI(GLFWwindow *window)
-{
-    ImGui::CreateContext();   // create imgui memory
-    ImGui::StyleColorsDark(); // select theme
-
-    // bind imgui to glfw and opengl
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init("#version 460");
-}
-
 int main()
 {
     core::Logger::Init();
@@ -172,27 +161,11 @@ int main()
     renderer->Init();
 
     ScenePrepare();
-    initIMGUI(App.GetWindow());
     while (true)
     {
         controller->Update(App.GetDeltaTime());
 
-        // 开始ImGui帧
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-
-        // 构建UI
-        ImGui::Begin("Settings");
-        ImGui::ColorEdit3("Clear Color", glm::value_ptr(clearColor));
-        ImGui::End();
-
-        renderer->SetClearColor(clearColor);
         render();
-
-        // 渲染ImGui
-        ImGui::Render();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         if (!App.Update()) // 避免先交换缓冲区再渲染
             break;

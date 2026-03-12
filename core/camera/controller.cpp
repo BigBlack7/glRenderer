@@ -1,6 +1,7 @@
 ﻿#include "controller.hpp"
 #include "application/application.hpp"
 #include "utils/logger.hpp"
+#include <imgui.h>
 #include <cmath>
 
 namespace core
@@ -137,6 +138,9 @@ namespace core
 
     void CameraController::OnCursorPos([[maybe_unused]] GLFWwindow *window, double xpos, double ypos)
     {
+        ImGuiIO &io = ImGui::GetIO();
+        if (io.WantCaptureMouse)
+            return;
         // 非控制模式或未绑定相机则忽略鼠标移动
         if (!mControlEnabled || !mCamera)
             return;
@@ -168,6 +172,9 @@ namespace core
 
     void CameraController::OnMouseButton(GLFWwindow *window, int button, int action, int mods)
     {
+        ImGuiIO &io = ImGui::GetIO();
+        if (io.WantCaptureMouse)
+            return;
         // TODO: 处理鼠标点击事件, 鼠标点选, 射线拾取(非漫游模式下)
         if (!mControlEnabled)
         {
@@ -177,6 +184,9 @@ namespace core
 
     void CameraController::OnScroll(GLFWwindow *window, double xoffset, double yoffset)
     {
+        ImGuiIO &io = ImGui::GetIO();
+        if (io.WantCaptureMouse)
+            return;
         if (!mCamera)
             return;
 
