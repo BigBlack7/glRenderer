@@ -5,6 +5,8 @@
 #include <geometry/transform.hpp>
 #include <material/material.hpp>
 #include <renderer/renderer.hpp>
+#include <scene/loader.hpp>
+#include <scene/model.hpp>
 #include <scene/entity.hpp>
 #include <scene/scene.hpp>
 #include <light/light.hpp>
@@ -25,6 +27,9 @@ std::shared_ptr<core::Shader> phongShader = nullptr;
 std::unique_ptr<core::Scene> scene = nullptr;
 core::EntityID boxID = core::InvalidEntityID;
 
+core::Entity* objRoot = nullptr;
+core::Entity* fbxRoot = nullptr;
+
 // 光源ID
 core::LightID mainDirLightID = core::InvalidLightID;
 core::LightID pointLightID = core::InvalidLightID;
@@ -43,17 +48,43 @@ void ScenePrepare()
     auto boxTex = std::make_shared<core::Texture>("box/box.png", 0);
     auto boxSMTex = std::make_shared<core::Texture>("box/sp_mask.png", 1);
     boxMaterial->SetTexture(core::TextureSlot::Albedo, boxTex);
-    boxMaterial->SetTexture(core::TextureSlot::SpecularMask, boxSMTex);
+    boxMaterial->SetTexture(core::TextureSlot::MetallicRoughness, boxSMTex);
     boxMaterial->SetVec3("uDefaultColor", glm::vec3(1.f, 1.f, 1.f));
     boxMaterial->SetFloat("uShininess", 4.f);
 
-    /* 实体构造阶段 */
+    /* 实体&场景构造阶段 */
     scene = std::make_unique<core::Scene>();
 
     boxID = scene->CreateEntity("Box");
     auto *box = scene->GetEntity(boxID);
     box->SetMesh(cube);
     box->SetMaterial(boxMaterial);
+
+    core::ModelLoadOptions opt{};
+    opt.__shader__ = phongShader;
+    opt.__flipTextureY__ = true;
+    // OBJ
+    auto objModel = core::ModelLoader::Load("bag/backpack.obj", opt);
+    if (objModel)
+    {
+        auto objInstance = objModel->Instantiate(*scene, "Backpack");
+        if ((objRoot = scene->GetEntity(objInstance.__rootEntity__)))
+        {
+            objRoot->GetTransform().SetPosition(glm::vec3(-2.f, 0.f, 0.f));
+            objRoot->GetTransform().SetScale(glm::vec3(0.3f));
+        }
+    }
+    // FBX
+    auto fbxModel = core::ModelLoader::Load("house.fbx", opt);
+    if (fbxModel)
+    {
+        auto fbxInstance = fbxModel->Instantiate(*scene, "House");
+        if ((fbxRoot = scene->GetEntity(fbxInstance.__rootEntity__)))
+        {
+            fbxRoot->GetTransform().SetPosition(glm::vec3(2.f, 0.f, 0.f));
+            fbxRoot->GetTransform().SetScale(glm::vec3(0.5f));
+        }
+    }
 
     /* 光源设置阶段 */
     core::DirectionalLight mainLight; // 创建定向光
@@ -78,6 +109,15 @@ void ScenePrepare()
 
 glm::vec4 clearColor{0.68f, 0.85f, 0.90f, 1.f};
 glm::vec3 boxPos{0.f, 0.f, 0.f};
+glm::vec3 boxRot{0.f, 0.f, 0.f};
+glm::vec3 boxScale{1.f, 1.f, 1.f};
+glm::vec3 objPos{-2.f, 0.f, 0.f};
+glm::vec3 objRot{0.f, 0.f, 0.f};
+glm::vec3 objScale{0.3f, 0.3f, 0.3f};
+glm::vec3 fbxPos{2.f, 0.f, 0.f};
+glm::vec3 fbxRot{0.f, 0.f, 0.f};
+glm::vec3 fbxScale{0.5f, 0.5f, 0.5f};
+
 void initIMGUI(GLFWwindow *window)
 {
     ImGui::CreateContext();   // create imgui memory
@@ -123,10 +163,32 @@ int main()
         // 构建UI - ImGui帧后Render前
         ImGui::Begin("Settings");
         ImGui::ColorEdit3("Clear Color", glm::value_ptr(clearColor));
+        
         ImGui::SliderFloat3("Box Position", glm::value_ptr(boxPos), -5.f, 5.f);
+        ImGui::SliderFloat3("Box Rotation", glm::value_ptr(boxRot), -180.f, 180.f);
+        ImGui::SliderFloat3("Box Scale", glm::value_ptr(boxScale), 0.1f, 5.f);
+
+        ImGui::SliderFloat3("Obj Position", glm::value_ptr(objPos), -5.f, 5.f);
+        ImGui::SliderFloat3("Obj Rotation", glm::value_ptr(objRot), -180.f, 180.f);
+        ImGui::SliderFloat3("Obj Scale", glm::value_ptr(objScale), 0.1f, 5.f);
+
+        ImGui::SliderFloat3("Fbx Position", glm::value_ptr(fbxPos), -5.f, 5.f);
+        ImGui::SliderFloat3("Fbx Rotation", glm::value_ptr(fbxRot), -180.f, 180.f);
+        ImGui::SliderFloat3("Fbx Scale", glm::value_ptr(fbxScale), 0.1f, 5.f);
         ImGui::End();
 
         scene->GetEntity(boxID)->GetTransform().SetPosition(boxPos);
+        scene->GetEntity(boxID)->GetTransform().SetEulerXyzRad(boxRot);
+        scene->GetEntity(boxID)->GetTransform().SetScale(boxScale);
+
+        objRoot->GetTransform().SetPosition(objPos);
+        objRoot->GetTransform().SetEulerXyzRad(objRot);
+        objRoot->GetTransform().SetScale(objScale);
+
+        fbxRoot->GetTransform().SetPosition(fbxPos);
+        fbxRoot->GetTransform().SetEulerXyzRad(fbxRot);
+        fbxRoot->GetTransform().SetScale(fbxScale);
+        
         renderer->SetClearColor(clearColor);
         renderer->Render(*scene, *camera, static_cast<float>(glfwGetTime()));
 

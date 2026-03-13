@@ -83,11 +83,27 @@ namespace core
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
         mWindow.reset(glfwCreateWindow(mWidth, mHeight, "GLRenderer", nullptr, nullptr));
-        if (mWindow == nullptr)
+        if (!mWindow)
         {
             GL_CRITICAL("[Application] Failed To Create GLFW Window");
             return false;
         }
+
+        // 获取主显示器的视频模式
+        if (auto *primaryMonitor = glfwGetPrimaryMonitor())
+        {
+            if (const auto *vidMode = glfwGetVideoMode(primaryMonitor))
+            {
+                // 计算窗口居中位置
+                int windowPosX = (vidMode->width - mWidth) / 2;
+                int windowPosY = (vidMode->height - mHeight) / 2;
+
+                // 设置窗口位置到屏幕中央
+                glfwSetWindowPos(mWindow.get(), windowPosX, windowPosY);
+                GL_INFO("[Application] Window centered at position ({}, {})", windowPosX, windowPosY);
+            }
+        }
+
         // 创建glfw上下文
         glfwMakeContextCurrent(mWindow.get());
 

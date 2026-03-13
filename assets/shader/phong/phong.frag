@@ -9,15 +9,15 @@ in vec3 oFragPos;
 
 // sampler
 uniform sampler2D uAlbedoSampler;
-uniform sampler2D uSpecularMaskSampler;
+uniform sampler2D uMetallicRoughSampler;
 
 // uniform
 uniform uint uMaterialFlags;
-uniform vec3 uDefaultColor;
-uniform float uShininess;
+uniform vec3 uDefaultColor = vec3(1.0);
+uniform float uShininess = 64.0;
 
 const uint MAT_HAS_ALBEDO_TEX = (1u << 0u); // 漫反射贴图
-const uint MAT_HAS_SPECULAR_MASK_TEX = (1u << 6u); // 高光遮罩贴图
+const uint MAT_HAS_METALLIC_ROUGHNESS_TEX = (1u << 2u); // 金属粗糙度贴图
 
 layout(std140, binding = 0)uniform FrameBlock
 {
@@ -34,7 +34,7 @@ void main()
     vec3 N = normalize(oNormal);
     vec3 V = normalize(uViewPosTime.xyz - oFragPos);
     vec3 object_color = ((uMaterialFlags & MAT_HAS_ALBEDO_TEX) != 0u) ? texture(uAlbedoSampler, oUV).rgb : uDefaultColor;
-    float specular_mask = ((uMaterialFlags & MAT_HAS_SPECULAR_MASK_TEX) != 0u) ? texture(uSpecularMaskSampler, oUV).r : 1.0;
+    float specular_mask = ((uMaterialFlags & MAT_HAS_METALLIC_ROUGHNESS_TEX) != 0u) ? texture(uMetallicRoughSampler, oUV).r : 1.0;
     
     vec3 diffuse_color = vec3(0.0);
     vec3 specular_color = vec3(0.0);

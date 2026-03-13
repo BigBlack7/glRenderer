@@ -20,7 +20,6 @@ namespace core
         AO,
         Emissive,
         OpacityMask,
-        SpecularMask,
         Count // 纹理槽数量
     };
 
@@ -35,11 +34,10 @@ namespace core
         std::array<std::string, TextureSlotCount> mTextureUniformNames{
             "uAlbedoSampler",        // Albedo
             "uNormalSampler",        // Normal
-            "uMetallicRoughSampler", // MetallicRoughness
+            "uMetallicRoughSampler", // MetallicRoughness(for Blinn-Phong -> SpecularMask)
             "uAOSampler",            // AO
             "uEmissiveSampler",      // Emissive
-            "uOpacitySampler",        // OpacityMask
-            "uSpecularMaskSampler"   // SpecularMask
+            "uOpacitySampler"       // OpacityMask
         };
 
         // 材质特性位掩码

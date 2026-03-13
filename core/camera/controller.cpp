@@ -96,9 +96,9 @@ namespace core
             move -= right;
 
         // 上下沿世界Y轴移动
-        if (IsKeyDown(GLFW_KEY_UP)) // 上
+        if (IsKeyDown(GLFW_KEY_Q)) // 上
             move += mWorldUp;
-        if (IsKeyDown(GLFW_KEY_DOWN)) // 下
+        if (IsKeyDown(GLFW_KEY_E)) // 下
             move -= mWorldUp;
 
         if (glm::length(move) > 0.0f)
@@ -138,14 +138,16 @@ namespace core
 
     void CameraController::OnCursorPos([[maybe_unused]] GLFWwindow *window, double xpos, double ypos)
     {
-        ImGuiIO &io = ImGui::GetIO();
-        if (io.WantCaptureMouse)
-            return;
         // 非控制模式或未绑定相机则忽略鼠标移动
         if (!mControlEnabled || !mCamera)
             return;
 
-        // 进入控制模式后的第一帧: 只记录坐标, 不计算偏移
+        // 漫游时忽略ImGui捕获鼠标事件, 避免干扰相机导致卡顿
+        ImGuiIO &io = ImGui::GetIO();
+        if (!mControlEnabled && io.WantCaptureMouse)
+            return;
+
+        // 进入控制模式后第一帧只记录坐标, 不计算偏移
         if (mFirstMouse)
         {
             mLastX = xpos;
