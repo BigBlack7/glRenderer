@@ -129,7 +129,7 @@ namespace core
         // 为每个顶层文件加载创建独立的循环包含检测集合
         std::unordered_set<std::string> includeGuard;
         const auto fullPath = ResolveShaderPath(filePath);
-        GL_TRACE("[Shader] Load File: {}", fullPath.string());
+        GL_DEBUG("[Shader] Load File: {}", fullPath.string());
         return LoadShaderRecursive(fullPath, includeGuard);
     }
 

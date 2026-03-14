@@ -35,6 +35,28 @@ core::LightID mainDirLightID = core::InvalidLightID;
 core::LightID pointLightID = core::InvalidLightID;
 core::LightID spotLightID = core::InvalidLightID;
 
+void BuildLights()
+{
+    core::DirectionalLight mainLight; // 创建定向光
+    mainLight.SetDirection(glm::vec3(0.f, 0.f, -1.f));
+    mainLight.SetColor(glm::vec3(1.f, 1.f, 1.f));
+    mainLight.SetIntensity(0.9f);
+    mainDirLightID = scene->CreateDirectionalLight(mainLight);
+
+    core::PointLight pointLight; // 创建点光源
+    pointLight.SetPosition(glm::vec3(-20.f, 0.f, 0.f));
+    pointLight.SetColor(glm::vec3(1.f, 1.f, 1.f));
+    pointLight.SetIntensity(0.9f);
+    pointLightID = scene->CreatePointLight(pointLight);
+
+    core::SpotLight spotLight; // 创建聚光灯
+    spotLight.SetPosition(glm::vec3(1.f, 0.f, 0.f));
+    spotLight.SetDirection(glm::vec3(-1.f, 0.f, 0.f));
+    spotLight.SetColor(glm::vec3(1.f, 1.f, 1.f));
+    spotLight.SetIntensity(0.9f);
+    spotLightID = scene->CreateSpotLight(spotLight);
+}
+
 void ScenePrepare()
 {
     /* 着色器编译阶段 */
@@ -60,11 +82,13 @@ void ScenePrepare()
     box->SetMesh(cube);
     box->SetMaterial(boxMaterial);
 
-    core::ModelLoadOptions opt{};
-    opt.__shader__ = phongShader;
-    opt.__flipTextureY__ = true;
     // OBJ
-    auto objModel = core::ModelLoader::Load("bag/backpack.obj", opt);
+    core::ModelLoadOptions objOpt{};
+    objOpt.__shader__ = phongShader;
+    objOpt.__flipTextureY__ = true;
+    objOpt.__allowOverrideLoadedTextures__ = true;
+    objOpt.__globalTextureOverrides__[core::TextureSlot::AO] = "ao.jpg";
+    auto objModel = core::ModelLoader::Load("bag/backpack.obj", objOpt);
     if (objModel)
     {
         auto objInstance = objModel->Instantiate(*scene, "Backpack");
@@ -75,7 +99,10 @@ void ScenePrepare()
         }
     }
     // FBX
-    auto fbxModel = core::ModelLoader::Load("house.fbx", opt);
+    core::ModelLoadOptions fbxOpt{};
+    fbxOpt.__shader__ = phongShader;
+    fbxOpt.__flipTextureY__ = true;
+    auto fbxModel = core::ModelLoader::Load("house.fbx", fbxOpt);
     if (fbxModel)
     {
         auto fbxInstance = fbxModel->Instantiate(*scene, "House");
@@ -87,24 +114,7 @@ void ScenePrepare()
     }
 
     /* 光源设置阶段 */
-    core::DirectionalLight mainLight; // 创建定向光
-    mainLight.SetDirection(glm::vec3(0.f, 0.f, -1.f));
-    mainLight.SetColor(glm::vec3(1.f, 1.f, 1.f));
-    mainLight.SetIntensity(0.9f);
-    mainDirLightID = scene->CreateDirectionalLight(mainLight);
-
-    core::PointLight pointLight; // 创建点光源
-    pointLight.SetPosition(glm::vec3(-20.f, 0.f, 0.f));
-    pointLight.SetColor(glm::vec3(1.f, 1.f, 1.f));
-    pointLight.SetIntensity(0.9f);
-    pointLightID = scene->CreatePointLight(pointLight);
-
-    core::SpotLight spotLight; // 创建聚光灯
-    spotLight.SetPosition(glm::vec3(1.f, 0.f, 0.f));
-    spotLight.SetDirection(glm::vec3(-1.f, 0.f, 0.f));
-    spotLight.SetColor(glm::vec3(1.f, 1.f, 1.f));
-    spotLight.SetIntensity(0.9f);
-    spotLightID = scene->CreateSpotLight(spotLight);
+    BuildLights();
 }
 
 glm::vec4 clearColor{0.68f, 0.85f, 0.90f, 1.f};

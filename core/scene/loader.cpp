@@ -249,15 +249,47 @@ namespace core
             return nullptr;
         }
 
+        std::shared_ptr<Texture> LoadTexturePathWithCache(const std::filesystem::path &texturePath,
+                                                          const std::filesystem::path &modelDir,
+                                                          bool flipY,
+                                                          std::unordered_map<std::string, std::shared_ptr<Texture>> &textureCache)
+        {
+            if (texturePath.empty())
+                return nullptr;
+
+            const std::filesystem::path cachePath = texturePath.is_absolute() ? texturePath : (modelDir / texturePath);
+            const std::string cacheKey = cachePath.lexically_normal().generic_string();
+
+            if (const auto it = textureCache.find(cacheKey); it != textureCache.end())
+                return it->second;
+
+            Texture::CreateInfo info{};
+            info.__flipY__ = flipY;
+            auto tex = std::make_shared<Texture>(texturePath, 0u, modelDir, info);
+            if (tex && tex->IsValid())
+            {
+                textureCache.emplace(cacheKey, tex);
+                return tex;
+            }
+
+            GL_WARN("[ModelLoader] Manual Texture Load Failed: {}", texturePath.string());
+            return nullptr;
+        }
+
         // 从Assimp材质创建Material对象
         std::shared_ptr<Material> CreateMaterial(const aiMaterial &aiMaterial,
                                                  const aiScene &aiSceneRef,
                                                  const std::filesystem::path &modelDir,
-                                                 const std::shared_ptr<Shader> &shader,
-                                                 bool flipY,
-                                                 std::unordered_map<std::string, std::shared_ptr<Texture>> &textureCache)
+                                                 const ModelLoadOptions &options,
+                                                 std::unordered_map<std::string, std::shared_ptr<Texture>> &textureCache,
+                                                 const std::string &modelName)
         {
-            auto material = std::make_shared<Material>(shader); // 创建材质对象
+            auto material = std::make_shared<Material>(options.__shader__); // 创建材质对象
+
+            // 日志标识当前处理的模型
+            static thread_local int materialCounter = 0;
+            materialCounter++;
+            GL_INFO("[ModelLoader] Processing Material #{} For Model: '{}'", materialCounter, modelName);
 
             aiColor4D color{}; // 颜色
             // 尝试获取基础颜色或漫反射颜色
@@ -279,10 +311,10 @@ namespace core
                     aiSceneRef,
                     modelDir,
                     {aiTextureType_BASE_COLOR, aiTextureType_DIFFUSE},
-                    flipY,
+                    options.__flipTextureY__,
                     textureCache))
             {
-                GL_INFO("[ModelLoader] Albedo Map Detected");
+                GL_INFO("[ModelLoader] '{}' - Albedo Texture Loaded Successfully", modelName);
                 material->SetTexture(TextureSlot::Albedo, std::move(albedo));
             }
 
@@ -292,28 +324,52 @@ namespace core
                     aiSceneRef,
                     modelDir,
                     {aiTextureType_METALNESS, aiTextureType_DIFFUSE_ROUGHNESS, aiTextureType_SPECULAR, aiTextureType_SHININESS},
-                    flipY,
+                    options.__flipTextureY__,
                     textureCache))
             {
-                GL_INFO("[ModelLoader] MetallicRoughness Map Detected");
+                GL_INFO("[ModelLoader] '{}' - MetallicRoughness Texture Loaded Successfully", modelName);
                 material->SetTexture(TextureSlot::MetallicRoughness, std::move(metallicRough));
             }
 
             // TODO: Normal map通道接入TBN后开启
             if (HasAnyTexture(aiMaterial, {aiTextureType_NORMALS, aiTextureType_NORMAL_CAMERA, aiTextureType_HEIGHT}))
-                GL_INFO("[ModelLoader] TODO: Normal Map Detected But Not Consumed Yet");
+                GL_DEBUG("[ModelLoader] TODO: '{}' - Normal Map Detected But Not Consumed Yet", modelName);
 
             // TODO: AO通道接入后开启
             if (HasAnyTexture(aiMaterial, {aiTextureType_AMBIENT_OCCLUSION, aiTextureType_LIGHTMAP}))
-                GL_INFO("[ModelLoader] TODO: AO Map Detected But Not Consumed Yet");
+                GL_DEBUG("[ModelLoader] TODO: '{}' - AO Map Detected But Not Consumed Yet", modelName);
 
             // TODO: Emissive通道接入后开启
             if (HasAnyTexture(aiMaterial, {aiTextureType_EMISSIVE, aiTextureType_EMISSION_COLOR}))
-                GL_INFO("[ModelLoader] TODO: Emissive Map Detected But Not Consumed Yet");
+                GL_DEBUG("[ModelLoader] TODO: '{}' - Emissive Map Detected But Not Consumed Yet", modelName);
 
             // TODO: OpacityMask通道接入后开启
             if (HasAnyTexture(aiMaterial, {aiTextureType_OPACITY}))
-                GL_INFO("[ModelLoader] TODO: Opacity Mask Detected But Not Consumed Yet");
+                GL_DEBUG("[ModelLoader] TODO: '{}' - Opacity Mask Detected But Not Consumed Yet", modelName);
+
+            for (const auto &[slot, texturePath] : options.__globalTextureOverrides__)
+            {
+                const auto existingTexture = material->GetTexture(slot);
+                if (existingTexture && !options.__allowOverrideLoadedTextures__)
+                {
+                    GL_WARN("[ModelLoader] '{}' - Global Texture Fallback Skipped: Slot={}, Existing='{}'", modelName, static_cast<uint32_t>(slot), existingTexture->GetDebugName());
+                    continue;
+                }
+
+                if (auto manualTexture = LoadTexturePathWithCache(texturePath, modelDir, options.__flipTextureY__, textureCache))
+                {
+                    if (existingTexture && options.__allowOverrideLoadedTextures__)
+                    {
+                        GL_WARN("[ModelLoader] '{}' - Global Texture Fallback Replaced Existing Texture: Slot={}, Old='{}', New='{}'", modelName, static_cast<uint32_t>(slot), existingTexture->GetDebugName(), manualTexture->GetDebugName());
+                    }
+                    else
+                    {
+                        GL_INFO("[ModelLoader] '{}' - Global Texture Fallback Applied: Slot={}, Path='{}'", modelName, static_cast<uint32_t>(slot), texturePath.generic_string());
+                    }
+
+                    material->SetTexture(slot, manualTexture);
+                }
+            }
 
             return material;
         }
@@ -431,7 +487,7 @@ namespace core
             if (!matRef) // 跳过空材质
                 continue;
 
-            materials[i] = detail::CreateMaterial(*matRef, *aiSceneRef, resolvedPath.parent_path(), options.__shader__, options.__flipTextureY__, textureCache);
+            materials[i] = detail::CreateMaterial(*matRef, *aiSceneRef, resolvedPath.parent_path(), options, textureCache, model->GetName());
         }
 
         // 创建默认材质

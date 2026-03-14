@@ -1,6 +1,6 @@
 ﻿# GLRenderer
 
-- Build it by MSVC With C++20.
+- Build it by MSVC with C++20.
 - Refer to LearOpenGL, Godot, Unity and So on.
 
 # NameFormat
