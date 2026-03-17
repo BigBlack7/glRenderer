@@ -20,7 +20,7 @@ namespace core
         const Camera *__camera__{nullptr};
         float __timeSec__{0.f};
 
-        RenderQueue __opaqueQueue__{};
+        RenderQueue __renderQueue__{};
         RenderProfiler __stats__{};
     };
 }

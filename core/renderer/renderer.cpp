@@ -1,5 +1,6 @@
 ﻿#include "renderer.hpp"
 #include "pass/forwardOpaquePass.hpp"
+#include "pass/forwardTransparentPass.hpp"
 #include "utils/logger.hpp"
 #include <memory>
 
@@ -25,6 +26,7 @@ namespace core
 
         mGraph.Reset();
         mGraph.AddPass(std::make_unique<ForwardOpaquePass>());
+        mGraph.AddPass(std::make_unique<ForwardTransparentPass>());
 
         if (!mGraph.Compile())
         {
@@ -55,7 +57,7 @@ namespace core
         context.__timeSec__ = timeSec;
 
         scene.UpdateWorldMatrices();
-        context.__opaqueQueue__.Build(scene);
+        context.__renderQueue__.Build(scene, camera);
 
         mBackend.SetClearColor(mClearColor);
 

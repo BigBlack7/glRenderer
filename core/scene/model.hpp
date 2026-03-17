@@ -15,6 +15,7 @@ namespace core
     class Scene;
     class Mesh;
     class Material;
+    struct RenderStateDesc;
 
     using ModelNodeID = uint32_t;
     constexpr ModelNodeID InvalidModelNodeID = std::numeric_limits<ModelNodeID>::max();
@@ -41,6 +42,11 @@ namespace core
     {
         EntityID __rootEntity__{InvalidEntityID}; // 根实体ID
         std::vector<EntityID> __nodeEntities__{}; // 节点实体ID列表
+    };
+
+    struct InstanceMaterialOverrideOptions final
+    {
+        bool __cloneMaterialsPerInstance__{true}; // 默认克隆, 避免影响共享材质
     };
 
     class Model final
@@ -90,6 +96,17 @@ namespace core
 
         /// @brief 解析骨骼节点, 关联骨骼信息到模型节点
         void ResolveBoneNodes();
+
+        /// @brief 应用渲染状态到模型实例, 避免修改一个影响全部, 实现同一模型的不同渲染效果
+        /// @param scene 目标场景
+        /// @param instance 模型实例
+        /// @param state 渲染状态描述
+        /// @param options 实例材质覆盖选项
+        /// @return 是否应用成功
+        bool ApplyRenderState(Scene &scene,
+                              const ModelInstance &instance,
+                              const RenderStateDesc &state,
+                              const InstanceMaterialOverrideOptions &options = {}) const;
 
         const std::string &GetName() const noexcept { return mName; }
         const std::vector<ModelNode> &GetNodes() const noexcept { return mNodes; }

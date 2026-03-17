@@ -21,7 +21,6 @@ namespace core
         bool __allowOverrideLoadedTextures__{false};     // 是否允许全局兜底纹理覆盖已自动解析的纹理
     };
 
-    // TODO: 模型手动设置额外的纹理材质例如AO、Roughness等, 避免加载模型时解析不到这些纹理信息导致材质不完整
     class ModelLoader final
     {
     public:

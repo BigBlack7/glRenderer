@@ -86,6 +86,12 @@ namespace core
         BumpVersion();
     }
 
+    void Material::SetRenderState(const RenderStateDesc &state)
+    {
+        mRenderState = state;
+        BumpVersion();
+    }
+
     void Material::SetFloat(std::string_view name, float value)
     {
         const std::string key(name);

@@ -27,8 +27,8 @@ std::shared_ptr<core::Shader> phongShader = nullptr;
 std::unique_ptr<core::Scene> scene = nullptr;
 core::EntityID boxID = core::InvalidEntityID;
 
-core::Entity* objRoot = nullptr;
-core::Entity* fbxRoot = nullptr;
+core::Entity *objRoot = nullptr;
+core::Entity *fbxRoot = nullptr;
 
 // 光源ID
 core::LightID mainDirLightID = core::InvalidLightID;
@@ -62,17 +62,31 @@ void ScenePrepare()
     /* 着色器编译阶段 */
     phongShader = std::make_shared<core::Shader>("phong/phong.vert", "phong/phong.frag");
     auto boxMaterial = std::make_shared<core::Material>(phongShader);
+    auto windowMaterial = std::make_shared<core::Material>(phongShader);
+    auto edgeMaterial = std::make_shared<core::Material>(phongShader);
 
     /* 几何生成阶段 */
     auto cube = core::Mesh::CreateCube(1.f);
+    auto plane = core::Mesh::CreatePlane(4.f);
 
     /* 材质处理阶段 */
     auto boxTex = std::make_shared<core::Texture>("box/box.png", 0);
     auto boxSMTex = std::make_shared<core::Texture>("box/sp_mask.png", 1);
     boxMaterial->SetTexture(core::TextureSlot::Albedo, boxTex);
     boxMaterial->SetTexture(core::TextureSlot::MetallicRoughness, boxSMTex);
-    boxMaterial->SetVec3("uDefaultColor", glm::vec3(1.f, 1.f, 1.f));
-    boxMaterial->SetFloat("uShininess", 4.f);
+    auto boxState = core::MakeOpaqueState();
+    boxState.mStencil.mStencilTest = true;
+    boxMaterial->SetRenderState(boxState);
+
+    auto windowTex = std::make_shared<core::Texture>("window.png", 0);
+    windowMaterial->SetTexture(core::TextureSlot::Albedo, windowTex);
+    windowMaterial->SetRenderState(core::MakeTransparentState());
+
+    auto edgeState = core::MakeTransparentState();
+    edgeState.mStencil.mStencilTest = true;
+    edgeState.mStencil.mFront.mStencilMask = 0x00;
+    edgeState.mStencil.mFront.mStencilFunc = core::CompareOp::NotEqual;
+    edgeMaterial->SetRenderState(edgeState);
 
     /* 实体&场景构造阶段 */
     scene = std::make_unique<core::Scene>();
@@ -82,33 +96,53 @@ void ScenePrepare()
     box->SetMesh(cube);
     box->SetMaterial(boxMaterial);
 
+    auto windowID = scene->CreateEntity("Window");
+    auto *window = scene->GetEntity(windowID);
+    window->SetMesh(cube);
+    window->SetMaterial(windowMaterial);
+    window->GetTransform().SetPosition(glm::vec3(0.f, 0.f, 2.f));
+
+    auto edgeID = scene->CreateEntity("Edge");
+    auto *edge = scene->GetEntity(edgeID);
+    edge->SetMesh(cube);
+    edge->SetMaterial(edgeMaterial);
+    edge->GetTransform().SetPosition(box->GetTransform().GetPosition());
+    edge->GetTransform().SetScale(glm::vec3(1.2f));
+    scene->Reparent(edgeID, boxID);
+
     // OBJ
     core::ModelLoadOptions objOpt{};
     objOpt.__shader__ = phongShader;
     objOpt.__flipTextureY__ = true;
-    objOpt.__allowOverrideLoadedTextures__ = true;
     objOpt.__globalTextureOverrides__[core::TextureSlot::AO] = "ao.jpg";
     auto objModel = core::ModelLoader::Load("bag/backpack.obj", objOpt);
     if (objModel)
     {
         auto objInstance = objModel->Instantiate(*scene, "Backpack");
+        auto objState = core::MakeTransparentState();
+        objState.mOpacity = 0.5f;
+        objModel->ApplyRenderState(*scene, objInstance, objState, {});
         if ((objRoot = scene->GetEntity(objInstance.__rootEntity__)))
         {
             objRoot->GetTransform().SetPosition(glm::vec3(-2.f, 0.f, 0.f));
-            objRoot->GetTransform().SetScale(glm::vec3(0.3f));
+            objRoot->GetTransform().SetScale(glm::vec3(0.5f));
         }
     }
     // FBX
     core::ModelLoadOptions fbxOpt{};
     fbxOpt.__shader__ = phongShader;
     fbxOpt.__flipTextureY__ = true;
-    auto fbxModel = core::ModelLoader::Load("house.fbx", fbxOpt);
+    fbxOpt.__globalTextureOverrides__[core::TextureSlot::Albedo] = "grass/grass.jpg";
+    fbxOpt.__globalTextureOverrides__[core::TextureSlot::OpacityMask] = "grass/grassMask.png";
+    auto fbxModel = core::ModelLoader::Load("grass.fbx", fbxOpt);
     if (fbxModel)
     {
-        auto fbxInstance = fbxModel->Instantiate(*scene, "House");
+        auto fbxInstance = fbxModel->Instantiate(*scene, "Grass");
+        auto fbxState = core::MakeCutoutState();
+        fbxModel->ApplyRenderState(*scene, fbxInstance, fbxState, {});
         if ((fbxRoot = scene->GetEntity(fbxInstance.__rootEntity__)))
         {
-            fbxRoot->GetTransform().SetPosition(glm::vec3(2.f, 0.f, 0.f));
+            fbxRoot->GetTransform().SetPosition(glm::vec3(2.5f, 0.f, 0.f));
             fbxRoot->GetTransform().SetScale(glm::vec3(0.5f));
         }
     }
@@ -123,10 +157,10 @@ glm::vec3 boxRot{0.f, 0.f, 0.f};
 glm::vec3 boxScale{1.f, 1.f, 1.f};
 glm::vec3 objPos{-2.f, 0.f, 0.f};
 glm::vec3 objRot{0.f, 0.f, 0.f};
-glm::vec3 objScale{0.3f, 0.3f, 0.3f};
-glm::vec3 fbxPos{2.f, 0.f, 0.f};
+glm::vec3 objScale{0.5f};
+glm::vec3 fbxPos{2.5f, 0.f, 0.f};
 glm::vec3 fbxRot{0.f, 0.f, 0.f};
-glm::vec3 fbxScale{0.5f, 0.5f, 0.5f};
+glm::vec3 fbxScale{0.002f};
 
 void initIMGUI(GLFWwindow *window)
 {
@@ -173,7 +207,7 @@ int main()
         // 构建UI - ImGui帧后Render前
         ImGui::Begin("Settings");
         ImGui::ColorEdit3("Clear Color", glm::value_ptr(clearColor));
-        
+
         ImGui::SliderFloat3("Box Position", glm::value_ptr(boxPos), -5.f, 5.f);
         ImGui::SliderFloat3("Box Rotation", glm::value_ptr(boxRot), -180.f, 180.f);
         ImGui::SliderFloat3("Box Scale", glm::value_ptr(boxScale), 0.1f, 5.f);
@@ -198,7 +232,7 @@ int main()
         fbxRoot->GetTransform().SetPosition(fbxPos);
         fbxRoot->GetTransform().SetEulerXyzRad(fbxRot);
         fbxRoot->GetTransform().SetScale(fbxScale);
-        
+
         renderer->SetClearColor(clearColor);
         renderer->Render(*scene, *camera, static_cast<float>(glfwGetTime()));
 

@@ -1,5 +1,7 @@
 ﻿#include "model.hpp"
 #include "scene.hpp"
+#include "material/material.hpp"
+#include <unordered_map>
 #include <algorithm>
 #include <string>
 #include <utility>
@@ -153,5 +155,61 @@ namespace core
             if (bone.__node__ != InvalidModelNodeID)
                 mNodes[bone.__node__].__isSkeletonNode__ = true;
         }
+    }
+
+    bool Model::ApplyRenderState(Scene &scene, const ModelInstance &instance, const RenderStateDesc &state, const InstanceMaterialOverrideOptions &options) const
+    {
+        // 实例中没有实体直接返回
+        if (instance.__nodeEntities__.empty())
+            return false;
+
+        bool anyUpdated = false; // 标记是否有任何更新发生
+        std::unordered_map<const Material *, std::shared_ptr<Material>> cloneCache{}; // 材质克隆缓存
+        if (options.__cloneMaterialsPerInstance__)
+            cloneCache.reserve(instance.__nodeEntities__.size()); // 预分配缓存
+
+        for (EntityID entityID : instance.__nodeEntities__)
+        {
+            if (entityID == InvalidEntityID) // 无效实体ID检查
+                continue;
+
+            Entity *entity = scene.GetEntity(entityID);
+            if (!entity) // 实体不存在检查
+                continue;
+
+            const auto &srcMaterial = entity->GetMaterial();
+            if (!srcMaterial) // 材质不存在检查
+                continue;
+
+            // 状态一致则跳过
+            if (srcMaterial->GetRenderState() == state)
+                continue;
+
+            // 如果不需要克隆直接修改原材质
+            if (!options.__cloneMaterialsPerInstance__)
+            {
+                srcMaterial->SetRenderState(state);
+                anyUpdated = true;
+                continue;
+            }
+
+            // 检查是否已经克隆过这个材质, 如果没有则克隆并设置新状态
+            auto it = cloneCache.find(srcMaterial.get());
+            if (it == cloneCache.end())
+            {
+                auto clonedMaterial = std::make_shared<Material>(*srcMaterial);
+                clonedMaterial->SetRenderState(state);
+                it = cloneCache.emplace(srcMaterial.get(), std::move(clonedMaterial)).first;
+            }
+
+            // 应用克隆材质
+            if (entity->GetMaterial() != it->second)
+            {
+                entity->SetMaterial(it->second);
+                anyUpdated = true;
+            }
+        }
+
+        return anyUpdated;
     }
 }

@@ -11,6 +11,7 @@
 #endif
 
 const float EPS = 0.000001;
+const float specularIntensity = 0.1;
 
 struct DirectionalLightGPU
 {
@@ -52,7 +53,7 @@ vec3 GetSpecular(vec3 normal, vec3 viewDir, vec3 lightDir, float shininess, floa
 {
     vec3 halfwayDir = normalize(lightDir + viewDir);
     float spec = pow(max(dot(normal, halfwayDir), 0.0), shininess);
-    return spec * specularMask * vec3(1.0);
+    return spec * specularMask * vec3(1.0) * specularIntensity;
 }
 
 vec3 GetDirectionalLight(DirectionalLightGPU light, vec3 normal, vec3 viewDir, vec3 objectColor, float shininess, float specularMask, out vec3 diffuseOut, out vec3 specularOut)

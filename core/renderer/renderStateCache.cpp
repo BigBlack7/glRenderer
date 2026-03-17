@@ -45,8 +45,7 @@ namespace core
         if (mTexture2D[unit] == textureID)
             return false;
 
-        glActiveTexture(GL_TEXTURE0 + unit);
-        glBindTexture(GL_TEXTURE_2D, textureID);
+        glBindTextureUnit(unit, textureID);
         mTexture2D[unit] = textureID; // 更新缓存状态
         return true;
     }

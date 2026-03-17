@@ -305,6 +305,12 @@ namespace core
             else
                 material->SetFloat("uShininess", 64.f); // 默认光泽度64
 
+            // 尝试获取透明度
+            ai_real opacityRaw = 1.f; // 原始透明度
+            if (AI_SUCCESS == aiGetMaterialFloat(&aiMaterial, AI_MATKEY_OPACITY, &opacityRaw))
+                opacityRaw = std::clamp(opacityRaw, static_cast<ai_real>(0.f), static_cast<ai_real>(1.f));
+            const float opacity = static_cast<float>(opacityRaw);
+
             // 加载反照率纹理(Albedo/Diffuse)
             if (auto albedo = LoadTextureWithCache(
                     aiMaterial,
@@ -343,9 +349,17 @@ namespace core
             if (HasAnyTexture(aiMaterial, {aiTextureType_EMISSIVE, aiTextureType_EMISSION_COLOR}))
                 GL_DEBUG("[ModelLoader] TODO: '{}' - Emissive Map Detected But Not Consumed Yet", modelName);
 
-            // TODO: OpacityMask通道接入后开启
-            if (HasAnyTexture(aiMaterial, {aiTextureType_OPACITY}))
-                GL_DEBUG("[ModelLoader] TODO: '{}' - Opacity Mask Detected But Not Consumed Yet", modelName);
+            if (auto opacityMask = LoadTextureWithCache(
+                    aiMaterial,
+                    aiSceneRef,
+                    modelDir,
+                    {aiTextureType_OPACITY},
+                    options.__flipTextureY__,
+                    textureCache))
+            {
+                GL_INFO("[ModelLoader] '{}' - Opacity Mask Texture Loaded Successfully", modelName);
+                material->SetTexture(TextureSlot::OpacityMask, std::move(opacityMask));
+            }
 
             for (const auto &[slot, texturePath] : options.__globalTextureOverrides__)
             {
@@ -370,6 +384,23 @@ namespace core
                     material->SetTexture(slot, manualTexture);
                 }
             }
+
+            RenderStateDesc renderState = MakeOpaqueState();
+            renderState.mOpacity = opacity;
+
+            const bool hasOpacityMask = (material->GetTexture(TextureSlot::OpacityMask) != nullptr);
+            if (opacity < 0.999f)
+            {
+                renderState = MakeTransparentState();
+                renderState.mOpacity = opacity;
+            }
+            else if (hasOpacityMask)
+            {
+                renderState = MakeCutoutState(0.5f);
+                renderState.mOpacity = opacity;
+            }
+
+            material->SetRenderState(renderState);
 
             return material;
         }

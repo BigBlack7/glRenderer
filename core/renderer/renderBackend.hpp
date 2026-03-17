@@ -4,6 +4,7 @@
 #include "frameData.hpp"
 #include "renderQueue.hpp"
 #include "renderStateCache.hpp"
+#include "renderOption.hpp"
 #include "profiler.hpp"
 #include <array>
 #include <cstdint>
@@ -40,6 +41,9 @@ namespace core
         bool mInitialized{false};
         glm::vec4 mClearColor{};
 
+        RenderStateDesc mAppliedState{};// 已应用的渲染状态描述
+        bool mHasAppliedState{false}; // 是否已应用渲染状态
+
     private:
         /// @brief 为着色器程序绑定uniform block到指定槽位
         /// @param shader 目标着色器
@@ -55,6 +59,15 @@ namespace core
         /// @param mesh 网格对象
         /// @param stats 渲染性能统计
         void DrawMesh(const Mesh &mesh, RenderProfiler &stats);
+
+        /// @brief 应用渲染状态描述
+        /// @param state 渲染状态描述
+        void ApplyRenderState(const RenderStateDesc &state);
+
+        /// @brief 绘制可绘制项
+        /// @param items 绘制项数组
+        /// @param stats 渲染性能统计
+        void DrawItems(std::span<const DrawItem> items, RenderProfiler &stats);
 
     public:
         /// @brief 初始化渲染后端, 创建UBO并设置基础OpenGL状态
@@ -72,7 +85,8 @@ namespace core
         /// @param target 帧缓冲对象(为nullptr时渲染到默认帧缓冲)
         /// @param clearColor 清除颜色
         /// @param clearDepth 是否清除深度缓冲
-        void BeginRenderTarget(const FrameBuffer *target, bool clearDepth = true);
+        /// @param clearStencil 是否清除模板缓冲
+        void BeginRenderTarget(const FrameBuffer *target, bool clearColor = true, bool clearDepth = true, bool clearStencil = false);
 
         /// @brief 结束当前渲染目标
         void EndRenderTarget();
@@ -94,6 +108,14 @@ namespace core
         /// @param queue 渲染队列
         /// @param stats 渲染性能统计
         void DrawOpaqueQueue(const RenderQueue &queue, RenderProfiler &stats);
+
+        /// @brief 绘制透明物体队列
+        /// @param queue 渲染队列
+        /// @param stats 渲染性能统计
+        void DrawTransparentQueue(const RenderQueue &queue, RenderProfiler &stats);
+
+        /// @brief 应用Pass级基线状态(不依赖材质, 保证每个pass入口确定性)
+        void ApplyPassState(const RenderStateDesc &state);
 
         void SetClearColor(const glm::vec4 &color) { mClearColor = color; }
         const glm::vec4 &GetClearColor() const noexcept { return mClearColor; }

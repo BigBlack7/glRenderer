@@ -31,6 +31,22 @@ namespace core
                 return a.__mesh__ < b.__mesh__;
             return a.__entityID__ < b.__entityID__;
         }
+
+        /// @brief 透明物体排序比较函数
+        /// @param a 渲染项A
+        /// @param b 渲染项B
+        /// @return 是否A在B之前
+        /*
+         * 排序优先级:
+         * 1. 距离相机平方: 近的物体先渲染, 避免深度冲突
+         * 2. EntityID实体ID: 最后按ID排序, 确保确定性排序
+         */
+        bool CompareTransparent(const DrawItem &a, const DrawItem &b)
+        {
+            if (a.__distanceToCameraSq__ != b.__distanceToCameraSq__)
+                return a.__distanceToCameraSq__ > b.__distanceToCameraSq__;
+            return a.__entityID__ < b.__entityID__;
+        }
     }
 
     /*
@@ -46,10 +62,12 @@ namespace core
      * - 空间复杂度: O(n)(存储所有可渲染对象)
      * - 内存分配: 最小化(使用vector预分配)
      */
-    void RenderQueue::Build(const Scene &scene)
+    void RenderQueue::Build(const Scene &scene, const Camera &camera)
     {
         // 清空旧数据
-        mOpaqueItems.clear();
+        Clear();
+
+        const glm::vec3 cameraPos = camera.GetPosition();
 
         // 遍历场景收集可渲染对象
         scene.ForEachRenderable([&](EntityID id, const Entity &entity, const glm::mat4 &world, const glm::mat3 &normal)
@@ -74,11 +92,22 @@ namespace core
                                     item.__shader__ = shader.get();
                                     item.__world__ = world;
                                     item.__normal__ = normal;
-                                    mOpaqueItems.push_back(std::move(item));
+
+                                    const glm::vec3 worldPos = glm::vec3(world[3]); // 提取世界位置(第四列)
+                                    const glm::vec3 diff = worldPos - cameraPos;
+                                    item.__distanceToCameraSq__ = glm::dot(diff, diff);
+
+                                    // 根据材质域分类
+                                    const MaterialDomain domain = material->GetRenderState().mDomain;
+                                    if (domain == MaterialDomain::Transparent)
+                                        mTransparentItems.push_back(std::move(item));
+                                    else
+                                        mOpaqueItems.push_back(std::move(item));
                                     // end
                                 });
 
         // 按优化顺序排序, 最大化状态缓存命中率
         std::sort(mOpaqueItems.begin(), mOpaqueItems.end(), detail::CompareOpaque);
+        std::sort(mTransparentItems.begin(), mTransparentItems.end(), detail::CompareTransparent);
     }
 }

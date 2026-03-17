@@ -10,6 +10,160 @@
 
 namespace core
 {
+    namespace detail
+    {
+        GLenum ToGLCompareOp(CompareOp op)
+        {
+            switch (op)
+            {
+            case CompareOp::Never:
+                return GL_NEVER;
+            case CompareOp::Less:
+                return GL_LESS;
+            case CompareOp::Equal:
+                return GL_EQUAL;
+            case CompareOp::LessEqual:
+                return GL_LEQUAL;
+            case CompareOp::Greater:
+                return GL_GREATER;
+            case CompareOp::NotEqual:
+                return GL_NOTEQUAL;
+            case CompareOp::GreaterEqual:
+                return GL_GEQUAL;
+            case CompareOp::Always:
+                return GL_ALWAYS;
+            }
+            return GL_LESS;
+        }
+
+        GLenum ToGLStencilOp(StencilOp op)
+        {
+            switch (op)
+            {
+            case StencilOp::Keep:
+                return GL_KEEP;
+            case StencilOp::Zero:
+                return GL_ZERO;
+            case StencilOp::Replace:
+                return GL_REPLACE;
+            case StencilOp::IncrClamp:
+                return GL_INCR;
+            case StencilOp::DecrClamp:
+                return GL_DECR;
+            case StencilOp::Invert:
+                return GL_INVERT;
+            case StencilOp::IncrWrap:
+                return GL_INCR_WRAP;
+            case StencilOp::DecrWrap:
+                return GL_DECR_WRAP;
+            }
+            return GL_KEEP;
+        }
+
+        GLenum ToGLBlendFactor(BlendFactor f)
+        {
+            switch (f)
+            {
+            case BlendFactor::Zero:
+                return GL_ZERO;
+            case BlendFactor::One:
+                return GL_ONE;
+            case BlendFactor::SrcColor:
+                return GL_SRC_COLOR;
+            case BlendFactor::OneMinusSrcColor:
+                return GL_ONE_MINUS_SRC_COLOR;
+            case BlendFactor::DstColor:
+                return GL_DST_COLOR;
+            case BlendFactor::OneMinusDstColor:
+                return GL_ONE_MINUS_DST_COLOR;
+            case BlendFactor::SrcAlpha:
+                return GL_SRC_ALPHA;
+            case BlendFactor::OneMinusSrcAlpha:
+                return GL_ONE_MINUS_SRC_ALPHA;
+            case BlendFactor::DstAlpha:
+                return GL_DST_ALPHA;
+            case BlendFactor::OneMinusDstAlpha:
+                return GL_ONE_MINUS_DST_ALPHA;
+            case BlendFactor::ConstantColor:
+                return GL_CONSTANT_COLOR;
+            case BlendFactor::OneMinusConstantColor:
+                return GL_ONE_MINUS_CONSTANT_COLOR;
+            case BlendFactor::ConstantAlpha:
+                return GL_CONSTANT_ALPHA;
+            case BlendFactor::OneMinusConstantAlpha:
+                return GL_ONE_MINUS_CONSTANT_ALPHA;
+            }
+            return GL_ONE;
+        }
+
+        GLenum ToGLBlendOp(BlendOp op)
+        {
+            switch (op)
+            {
+            case BlendOp::Add:
+                return GL_FUNC_ADD;
+            case BlendOp::Subtract:
+                return GL_FUNC_SUBTRACT;
+            case BlendOp::ReverseSubtract:
+                return GL_FUNC_REVERSE_SUBTRACT;
+            case BlendOp::Min:
+                return GL_MIN;
+            case BlendOp::Max:
+                return GL_MAX;
+            }
+            return GL_FUNC_ADD;
+        }
+
+        GLenum ToGLCullMode(CullMode mode)
+        {
+            switch (mode)
+            {
+            case CullMode::Front:
+                return GL_FRONT;
+            case CullMode::Back:
+                return GL_BACK;
+            case CullMode::FrontAndBack:
+                return GL_FRONT_AND_BACK;
+            case CullMode::None:
+                return GL_BACK;
+            }
+            return GL_BACK;
+        }
+
+        GLenum ToGLFrontFace(FrontFace face)
+        {
+            return (face == FrontFace::CW) ? GL_CW : GL_CCW;
+        }
+
+        GLenum ToGLFillMode(FillMode mode)
+        {
+            switch (mode)
+            {
+            case FillMode::Fill:
+                return GL_FILL;
+            case FillMode::Line:
+                return GL_LINE;
+            case FillMode::Point:
+                return GL_POINT;
+            }
+            return GL_FILL;
+        }
+
+        GLenum ToGLPolygonOffsetMode(PolygonOffsetMode mode)
+        {
+            switch (mode)
+            {
+            case PolygonOffsetMode::Fill:
+                return GL_POLYGON_OFFSET_FILL;
+            case PolygonOffsetMode::Line:
+                return GL_POLYGON_OFFSET_LINE;
+            case PolygonOffsetMode::Point:
+                return GL_POLYGON_OFFSET_POINT;
+            }
+            return GL_POLYGON_OFFSET_FILL;
+        }
+    }
+
     bool RenderBackend::Init()
     {
         if (mInitialized)
@@ -27,9 +181,6 @@ namespace core
             return false;
         }
 
-        glEnable(GL_DEPTH_TEST);
-        glDepthFunc(GL_LESS);
-
         // 初始化状态缓存和光照缓存
         mStateCache.Reset();
         mCachedDirectionalCount = std::numeric_limits<uint32_t>::max();
@@ -39,6 +190,10 @@ namespace core
         mCachedSpotCount = std::numeric_limits<uint32_t>::max();
         mCachedSpotVersions.fill(std::numeric_limits<uint64_t>::max());
         mProgramBlockBoundCache.clear();
+
+        // 初始化默认渲染状态 - 不透明状态
+        mHasAppliedState = false;
+        ApplyRenderState(MakeOpaqueState());
 
         mInitialized = true;
         return true;
@@ -51,21 +206,54 @@ namespace core
         mStateCache.Reset();
         mProgramBlockBoundCache.clear();
         mInitialized = false;
+        mHasAppliedState = false;
     }
 
-    void RenderBackend::BeginRenderTarget(const FrameBuffer *target, bool clearDepth)
+    void RenderBackend::BeginRenderTarget(const FrameBuffer *target, bool clearColor, bool clearDepth, bool clearStencil)
     {
         if (target && target->IsValid())
             target->Bind(); // 绑定自定义帧缓冲
         else
             FrameBuffer::BindDefault(); // 绑定默认帧缓冲
 
-        // 设置清除颜色并执行清除操作
-        glClearColor(mClearColor.r, mClearColor.g, mClearColor.b, mClearColor.a);
-        GLbitfield flags = GL_COLOR_BUFFER_BIT;
-        if (clearDepth)
-            flags |= GL_DEPTH_BUFFER_BIT;
-        glClear(flags);
+        if (!clearColor && !clearDepth && !clearStencil) // 如果不需要清除任何缓冲区直接返回
+            return;
+
+        /*
+            不管原状态直接显式设置为清除所需的状态
+            确保清除操作一定能成功, 避免状态污染
+        */
+        glDisable(GL_SCISSOR_TEST);                      // 禁用裁剪测试
+        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE); // 启用所有颜色通道写入
+        glDepthMask(GL_TRUE);                            // 启用深度写入
+        glStencilMaskSeparate(GL_FRONT, 0xFF);           // 启用正面模板写入
+        glStencilMaskSeparate(GL_BACK, 0xFF);            // 启用背面模板写入
+
+        if (clearColor)
+        {
+            const GLfloat color[4] = {mClearColor.r, mClearColor.g, mClearColor.b, mClearColor.a};
+            glClearBufferfv(GL_COLOR, 0, color);
+        }
+
+        if (clearDepth && clearStencil)
+        {
+            glClearBufferfi(GL_DEPTH_STENCIL, 0, 1.f, 0);
+        }
+        else
+        {
+            if (clearDepth)
+            {
+                const GLfloat depth = 1.f;
+                glClearBufferfv(GL_DEPTH, 0, &depth);
+            }
+
+            if (clearStencil)
+            {
+                const GLint stencil = 0;
+                glClearBufferiv(GL_STENCIL, 0, &stencil);
+            }
+        }
+        mHasAppliedState = false;
     }
 
     void RenderBackend::EndRenderTarget() {}
@@ -201,6 +389,11 @@ namespace core
         // 设置材质特性标志
         shader.SetUInt("uMaterialFlags", material.GetFeatureFlags());
 
+        const RenderStateDesc &state = material.GetRenderState();
+        shader.SetUInt("uAlphaMode", static_cast<uint32_t>(state.mDomain));
+        shader.SetFloat("uAlphaCutoff", state.mAlphaCutoff);
+        shader.SetFloat("uOpacity", state.mOpacity);
+
         // 应用各种材质参数
         for (const auto &[name, value] : material.GetFloatParams())
             shader.SetFloat(name, value);
@@ -237,29 +430,224 @@ namespace core
         ++stats.__drawCalls__;
     }
 
-    void RenderBackend::DrawOpaqueQueue(const RenderQueue &queue, RenderProfiler &stats)
+    void RenderBackend::ApplyRenderState(const RenderStateDesc &state)
     {
-        const Material *lastMaterial = nullptr; // 缓存上一个材质
-        uint64_t lastMaterialVersion = 0u;      // 缓存上一个材质版本
-        const Shader *lastShader = nullptr;     // 缓存上一个着色器
+        const bool hasPrev = mHasAppliedState;       // 是否之前有应用过状态
+        const RenderStateDesc &prev = mAppliedState; // 获取之前的状态
 
-        for (const DrawItem &item : queue.GetOpaqueItems())
+        /* 统一只有状态变化时才应用 */
+        // Depth
+        if (!hasPrev || prev.mDepth.mDepthTest != state.mDepth.mDepthTest)
         {
-            if (!item.__shader__ || !item.__material__ || !item.__mesh__) // 跳过无效项
+            if (state.mDepth.mDepthTest)
+                glEnable(GL_DEPTH_TEST);
+            else
+                glDisable(GL_DEPTH_TEST);
+        }
+
+        // 深度函数和写入掩码
+        if (!hasPrev || prev.mDepth.mDepthFunc != state.mDepth.mDepthFunc)
+            glDepthFunc(detail::ToGLCompareOp(state.mDepth.mDepthFunc));
+
+        if (!hasPrev || prev.mDepth.mDepthWrite != state.mDepth.mDepthWrite)
+            glDepthMask(state.mDepth.mDepthWrite ? GL_TRUE : GL_FALSE);
+
+        // Blend
+        if (!hasPrev || prev.mBlend.mBlend != state.mBlend.mBlend)
+        {
+            if (state.mBlend.mBlend)
+                glEnable(GL_BLEND);
+            else
+                glDisable(GL_BLEND);
+        }
+
+        // 混合参数变化检测
+        const bool blendParamChanged =
+            !hasPrev ||
+            !prev.mBlend.mBlend ||
+            prev.mBlend.mSrcColor != state.mBlend.mSrcColor ||
+            prev.mBlend.mDstColor != state.mBlend.mDstColor ||
+            prev.mBlend.mSrcAlpha != state.mBlend.mSrcAlpha ||
+            prev.mBlend.mDstAlpha != state.mBlend.mDstAlpha ||
+            prev.mBlend.mColorOp != state.mBlend.mColorOp ||
+            prev.mBlend.mAlphaOp != state.mBlend.mAlphaOp;
+
+        // 只有混合开启且参数变化时才更新混合参数
+        if (state.mBlend.mBlend && blendParamChanged)
+        {
+            glBlendFuncSeparate(
+                detail::ToGLBlendFactor(state.mBlend.mSrcColor),
+                detail::ToGLBlendFactor(state.mBlend.mDstColor),
+                detail::ToGLBlendFactor(state.mBlend.mSrcAlpha),
+                detail::ToGLBlendFactor(state.mBlend.mDstAlpha));
+            glBlendEquationSeparate(
+                detail::ToGLBlendOp(state.mBlend.mColorOp),
+                detail::ToGLBlendOp(state.mBlend.mAlphaOp));
+        }
+
+        // Cull
+        const bool cullEnabledNow = state.mRaster.mFaceCull && state.mRaster.mCullFace != CullMode::None;
+        const bool cullEnabledPrev = hasPrev && prev.mRaster.mFaceCull && prev.mRaster.mCullFace != CullMode::None;
+
+        // 只有剔除开关状态变化时才调用
+        if (!hasPrev || cullEnabledPrev != cullEnabledNow)
+        {
+            if (cullEnabledNow)
+                glEnable(GL_CULL_FACE);
+            else
+                glDisable(GL_CULL_FACE);
+        }
+
+        // 剔除参数只有启用且变化时才更新
+        if (cullEnabledNow && (!hasPrev || !cullEnabledPrev ||
+                               prev.mRaster.mFrontFace != state.mRaster.mFrontFace ||
+                               prev.mRaster.mCullFace != state.mRaster.mCullFace))
+        {
+            glFrontFace(detail::ToGLFrontFace(state.mRaster.mFrontFace));
+            glCullFace(detail::ToGLCullMode(state.mRaster.mCullFace));
+        }
+
+        // Polygon mode
+        if (!hasPrev || prev.mRaster.mFillMode != state.mRaster.mFillMode)
+            glPolygonMode(GL_FRONT_AND_BACK, detail::ToGLFillMode(state.mRaster.mFillMode));
+
+        // Scissor
+        if (!hasPrev || prev.mRaster.mScissorTest != state.mRaster.mScissorTest)
+        {
+            if (state.mRaster.mScissorTest)
+                glEnable(GL_SCISSOR_TEST);
+            else
+                glDisable(GL_SCISSOR_TEST);
+        }
+
+        // MSAA
+        if (!hasPrev || prev.mRaster.mMultiSample != state.mRaster.mMultiSample)
+        {
+            if (state.mRaster.mMultiSample)
+                glEnable(GL_MULTISAMPLE);
+            else
+                glDisable(GL_MULTISAMPLE);
+        }
+
+        // Color mask
+        if (!hasPrev ||
+            prev.mRaster.mColorWriteR != state.mRaster.mColorWriteR ||
+            prev.mRaster.mColorWriteG != state.mRaster.mColorWriteG ||
+            prev.mRaster.mColorWriteB != state.mRaster.mColorWriteB ||
+            prev.mRaster.mColorWriteA != state.mRaster.mColorWriteA)
+        {
+            glColorMask(
+                state.mRaster.mColorWriteR ? GL_TRUE : GL_FALSE,
+                state.mRaster.mColorWriteG ? GL_TRUE : GL_FALSE,
+                state.mRaster.mColorWriteB ? GL_TRUE : GL_FALSE,
+                state.mRaster.mColorWriteA ? GL_TRUE : GL_FALSE);
+        }
+
+        // Polygon offset
+        const bool polyOffsetChanged =
+            !hasPrev ||
+            prev.mPolygonOffset.mPolygonOffset != state.mPolygonOffset.mPolygonOffset ||
+            prev.mPolygonOffset.mPolygonOffsetType != state.mPolygonOffset.mPolygonOffsetType ||
+            prev.mPolygonOffset.mFactor != state.mPolygonOffset.mFactor ||
+            prev.mPolygonOffset.mUnit != state.mPolygonOffset.mUnit;
+
+        if (polyOffsetChanged)
+        {
+            // 先全部禁用, 再按需启用
+            glDisable(GL_POLYGON_OFFSET_FILL);
+            glDisable(GL_POLYGON_OFFSET_LINE);
+            glDisable(GL_POLYGON_OFFSET_POINT);
+
+            if (state.mPolygonOffset.mPolygonOffset)
+            {
+                glEnable(detail::ToGLPolygonOffsetMode(state.mPolygonOffset.mPolygonOffsetType));
+                glPolygonOffset(state.mPolygonOffset.mFactor, state.mPolygonOffset.mUnit);
+            }
+        }
+
+        // Stencil
+        if (!hasPrev || prev.mStencil.mStencilTest != state.mStencil.mStencilTest)
+        {
+            if (state.mStencil.mStencilTest)
+                glEnable(GL_STENCIL_TEST);
+            else
+                glDisable(GL_STENCIL_TEST);
+        }
+
+        if (state.mStencil.mStencilTest)
+        {
+            // 检测两个模板面状态是否不同
+            auto FaceChanged = [](const StencilFaceState &a, const StencilFaceState &b) -> bool
+            {
+                return a.mStencilFunc != b.mStencilFunc ||
+                       a.mReference != b.mReference ||
+                       a.mStencilFuncMask != b.mStencilFuncMask ||
+                       a.mStencilMask != b.mStencilMask ||
+                       a.mSfail != b.mSfail ||
+                       a.mZfail != b.mZfail ||
+                       a.mZPass != b.mZPass;
+            };
+
+            // 综合检测模板状态是否变化
+            const bool stencilChanged =
+                !hasPrev ||
+                !prev.mStencil.mStencilTest ||
+                prev.mStencil.mSeparateFace != state.mStencil.mSeparateFace ||
+                FaceChanged(prev.mStencil.mFront, state.mStencil.mFront) ||
+                FaceChanged(prev.mStencil.mBack, state.mStencil.mBack);
+
+            if (stencilChanged)
+            {
+                const auto &front = state.mStencil.mFront;
+                const auto &back = state.mStencil.mBack;
+
+                // 根据是否双面不同设置分别处理
+                if (state.mStencil.mSeparateFace)
+                {
+                    glStencilFuncSeparate(GL_FRONT, detail::ToGLCompareOp(front.mStencilFunc), static_cast<GLint>(front.mReference), front.mStencilFuncMask);
+                    glStencilMaskSeparate(GL_FRONT, front.mStencilMask);
+                    glStencilOpSeparate(GL_FRONT, detail::ToGLStencilOp(front.mSfail), detail::ToGLStencilOp(front.mZfail), detail::ToGLStencilOp(front.mZPass));
+
+                    glStencilFuncSeparate(GL_BACK, detail::ToGLCompareOp(back.mStencilFunc), static_cast<GLint>(back.mReference), back.mStencilFuncMask);
+                    glStencilMaskSeparate(GL_BACK, back.mStencilMask);
+                    glStencilOpSeparate(GL_BACK, detail::ToGLStencilOp(back.mSfail), detail::ToGLStencilOp(back.mZfail), detail::ToGLStencilOp(back.mZPass));
+                }
+                else
+                {
+                    glStencilFunc(detail::ToGLCompareOp(front.mStencilFunc), static_cast<GLint>(front.mReference), front.mStencilFuncMask);
+                    glStencilMask(front.mStencilMask);
+                    glStencilOp(detail::ToGLStencilOp(front.mSfail), detail::ToGLStencilOp(front.mZfail), detail::ToGLStencilOp(front.mZPass));
+                }
+            }
+        }
+
+        mAppliedState = state;
+        mHasAppliedState = true;
+    }
+
+    void RenderBackend::DrawItems(std::span<const DrawItem> items, RenderProfiler &stats)
+    {
+        const Material *lastMaterial = nullptr;
+        uint64_t lastMaterialVersion = 0u;
+        const Shader *lastShader = nullptr;
+
+        for (const DrawItem &item : items)
+        {
+            if (!item.__shader__ || !item.__material__ || !item.__mesh__)
                 continue;
 
             const Shader &shader = *item.__shader__;
             const Material &material = *item.__material__;
 
-            if (mStateCache.UseProgram(shader.GetID())) // 着色器切换检测
+            if (mStateCache.UseProgram(shader.GetID()))
             {
-                ++stats.__programBinds__;  // 统计程序绑定
-                BindProgramBlocks(shader); // 绑定UBO
+                ++stats.__programBinds__;
+                BindProgramBlocks(shader);
                 lastShader = &shader;
-                lastMaterial = nullptr; // 重置材质缓存
+                lastMaterial = nullptr;
                 lastMaterialVersion = 0u;
             }
-            else if (lastShader != &shader) // 同一着色器但缓存未命中(理论上不应该发生)
+            else if (lastShader != &shader)
             {
                 BindProgramBlocks(shader);
                 lastShader = &shader;
@@ -267,9 +655,9 @@ namespace core
                 lastMaterialVersion = 0u;
             }
 
-            // 材质切换检测, 避免重复应用相同材质
             if (lastMaterial != &material || lastMaterialVersion != material.GetVersion())
             {
+                ApplyRenderState(material.GetRenderState());
                 ApplyMaterial(material, shader, stats);
                 lastMaterial = &material;
                 lastMaterialVersion = material.GetVersion();
@@ -279,5 +667,20 @@ namespace core
             shader.SetMat3("uN", item.__normal__);
             DrawMesh(*item.__mesh__, stats);
         }
+    }
+
+    void RenderBackend::DrawOpaqueQueue(const RenderQueue &queue, RenderProfiler &stats)
+    {
+        DrawItems(queue.GetOpaqueItems(), stats);
+    }
+
+    void RenderBackend::DrawTransparentQueue(const RenderQueue &queue, RenderProfiler &stats)
+    {
+        DrawItems(queue.GetTransparentItems(), stats);
+    }
+
+    void RenderBackend::ApplyPassState(const RenderStateDesc &state)
+    {
+        ApplyRenderState(state);
     }
 }

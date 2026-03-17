@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "renderer/renderOption.hpp"
 #include <glm/glm.hpp>
 #include <array>
 #include <cstdint>
@@ -44,6 +45,8 @@ namespace core
         uint32_t mFeatureFlags{0};
         // 材质版本号, 用于缓存管理
         uint64_t mVersion{1};
+        // 渲染状态描述
+        RenderStateDesc mRenderState{MakeOpaqueState()};
 
         std::unordered_map<std::string, float> mFloatParams{};
         std::unordered_map<std::string, int> mIntParams{};
@@ -86,6 +89,10 @@ namespace core
         /// @param uniformName 纹理采样器在shader中的uniform变量名
         void SetTextureUniformName(TextureSlot slot, std::string uniformName);
 
+        /// @brief 
+        /// @param state 
+        void SetRenderState(const RenderStateDesc &state);
+
         /* setter */
         void SetFloat(std::string_view name, float value);
         void SetInt(std::string_view name, int value);
@@ -94,6 +101,7 @@ namespace core
 
         uint32_t GetFeatureFlags() const { return mFeatureFlags; }
         uint64_t GetVersion() const noexcept { return mVersion; }
+        const RenderStateDesc &GetRenderState() const noexcept { return mRenderState; }
 
         /* getter */
         const std::array<std::shared_ptr<Texture>, TextureSlotCount> &GetTextures() const noexcept { return mTextures; }
