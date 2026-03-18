@@ -385,9 +385,9 @@ namespace core
                 }
             }
 
+            // 根据透明度判断渲染状态
             RenderStateDesc renderState = MakeOpaqueState();
             renderState.mOpacity = opacity;
-
             const bool hasOpacityMask = (material->GetTexture(TextureSlot::OpacityMask) != nullptr);
             if (opacity < 0.999f)
             {
@@ -399,7 +399,6 @@ namespace core
                 renderState = MakeCutoutState(0.5f);
                 renderState.mOpacity = opacity;
             }
-
             material->SetRenderState(renderState);
 
             return material;

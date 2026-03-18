@@ -138,8 +138,6 @@ void ScenePrepare()
     if (fbxModel)
     {
         auto fbxInstance = fbxModel->Instantiate(*scene, "Grass");
-        auto fbxState = core::MakeCutoutState();
-        fbxModel->ApplyRenderState(*scene, fbxInstance, fbxState, {});
         if ((fbxRoot = scene->GetEntity(fbxInstance.__rootEntity__)))
         {
             fbxRoot->GetTransform().SetPosition(glm::vec3(2.5f, 0.f, 0.f));
@@ -222,15 +220,15 @@ int main()
         ImGui::End();
 
         scene->GetEntity(boxID)->GetTransform().SetPosition(boxPos);
-        scene->GetEntity(boxID)->GetTransform().SetEulerXyzRad(boxRot);
+        scene->GetEntity(boxID)->GetTransform().SetEulerXyzDeg(boxRot);
         scene->GetEntity(boxID)->GetTransform().SetScale(boxScale);
 
         objRoot->GetTransform().SetPosition(objPos);
-        objRoot->GetTransform().SetEulerXyzRad(objRot);
+        objRoot->GetTransform().SetEulerXyzDeg(objRot);
         objRoot->GetTransform().SetScale(objScale);
 
         fbxRoot->GetTransform().SetPosition(fbxPos);
-        fbxRoot->GetTransform().SetEulerXyzRad(fbxRot);
+        fbxRoot->GetTransform().SetEulerXyzDeg(fbxRot);
         fbxRoot->GetTransform().SetScale(fbxScale);
 
         renderer->SetClearColor(clearColor);

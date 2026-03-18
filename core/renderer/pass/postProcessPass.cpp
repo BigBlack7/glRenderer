@@ -1,0 +1,45 @@
+﻿#include "postProcessPass.hpp"
+#include "renderer/renderBackend.hpp"
+#include "renderer/buffer/frameBuffer.hpp"
+#include "shader/shader.hpp"
+
+namespace core
+{
+    bool PostProcessPass::EnsureInit()
+    {
+        if (mShader && mShader->GetID() != 0)
+            return true;
+
+        if (mInitTried) // 初始化尝试过, 直接返回失败, 避免每帧重复失败初始化
+            return false;
+
+        mInitTried = true;
+        mShader = std::make_shared<Shader>("pass/postprocess.vert", "pass/postprocess.frag");
+        return mShader && mShader->GetID() != 0;
+    }
+
+    void PostProcessPass::Execute(FrameContext &ctx, RenderBackend &backend)
+    {
+        if (!ctx.__sceneColorTarget__ || !ctx.__sceneColorTarget__->IsValid())
+            return;
+
+        if (!EnsureInit())
+            return;
+
+        backend.BeginRenderTarget(nullptr, false, false, false);
+
+        if (ctx.__targetWidth__ > 0u && ctx.__targetHeight__ > 0u)
+            glViewport(0, 0, static_cast<GLsizei>(ctx.__targetWidth__), static_cast<GLsizei>(ctx.__targetHeight__));
+
+        RenderStateDesc postState = MakeOpaqueState();
+        postState.mDepth.mDepthTest = false;
+        postState.mDepth.mDepthWrite = false;
+        postState.mStencil.mStencilTest = false;
+        postState.mBlend.mBlend = false;
+        postState.mRaster.mFaceCull = false;
+        backend.ApplyPassState(postState);
+
+        backend.DrawFullscreenTexture(*mShader, ctx.__sceneColorTarget__->GetColorAttachment(), ctx.__stats__);
+        backend.EndRenderTarget();
+    }
+}

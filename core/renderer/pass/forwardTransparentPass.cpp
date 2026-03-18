@@ -8,7 +8,7 @@ namespace core
         if (!ctx.__scene__ || !ctx.__camera__)
             return;
 
-        backend.BeginRenderTarget(nullptr, false, false, false);
+        backend.BeginRenderTarget(ctx.__sceneColorTarget__, false, false, false);
 
         RenderStateDesc transparentPassState = MakeTransparentState();
         transparentPassState.mStencil.mStencilTest = false; // 基线关闭模板, 具体物体按材质打开

@@ -1,15 +1,20 @@
 ﻿#include "application.hpp"
 #include "utils/logger.hpp"
+#include <algorithm>
 
 namespace core
 {
     void Application::FramebufferSizeCallback(GLFWwindow *window, int width, int height)
     {
         Application *app = static_cast<Application *>(glfwGetWindowUserPointer(window));
-        if (app && app->mResizeCallback)
-        {
-            app->mResizeCallback(width, height);
-        }
+        if (!app)
+            return;
+
+        app->mWidth = static_cast<uint32_t>(std::max(width, 1));
+        app->mHeight = static_cast<uint32_t>(std::max(height, 1));
+
+        if (app->mResizeCallback)
+            app->mResizeCallback(app->mWidth, app->mHeight);
     }
 
     void Application::KeyBoardCallback(GLFWwindow *window, int key, int scancode, int action, int mods)

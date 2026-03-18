@@ -44,6 +44,8 @@ namespace core
         RenderStateDesc mAppliedState{};// 已应用的渲染状态描述
         bool mHasAppliedState{false}; // 是否已应用渲染状态
 
+        GLuint mFullscreenTriangleVAO{0}; // 全屏三角形VAO
+
     private:
         /// @brief 为着色器程序绑定uniform block到指定槽位
         /// @param shader 目标着色器
@@ -116,6 +118,12 @@ namespace core
 
         /// @brief 应用Pass级基线状态(不依赖材质, 保证每个pass入口确定性)
         void ApplyPassState(const RenderStateDesc &state);
+
+        /// @brief 绘制全屏纹理
+        /// @param shader 着色器程序
+        /// @param colorTexture 颜色纹理
+        /// @param stats 渲染性能统计
+        void DrawFullscreenTexture(const Shader &shader, GLuint colorTexture, RenderProfiler &stats);
 
         void SetClearColor(const glm::vec4 &color) { mClearColor = color; }
         const glm::vec4 &GetClearColor() const noexcept { return mClearColor; }

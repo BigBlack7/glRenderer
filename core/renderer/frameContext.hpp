@@ -4,9 +4,11 @@
 #include "profiler.hpp"
 #include "scene/scene.hpp"
 #include <glm/glm.hpp>
+#include <cstdint>
 
 namespace core
 {
+    class FrameBuffer;
     /*
      * FrameContext为渲染通道间的共享数据结构:
      * - 包含场景、摄像机等基础数据
@@ -19,6 +21,11 @@ namespace core
         Scene *__scene__{nullptr};
         const Camera *__camera__{nullptr};
         float __timeSec__{0.f};
+
+        // 渲染目标FBO
+        FrameBuffer *__sceneColorTarget__{nullptr};
+        uint32_t __targetWidth__{0};
+        uint32_t __targetHeight__{0};
 
         RenderQueue __renderQueue__{};
         RenderProfiler __stats__{};

@@ -102,7 +102,7 @@ namespace core
                                     if (domain == MaterialDomain::Transparent)
                                         mTransparentItems.push_back(std::move(item));
                                     else
-                                        mOpaqueItems.push_back(std::move(item));
+                                        mOpaqueItems.push_back(std::move(item)); // 不透明物体和镂空物体
                                     // end
                                 });
 

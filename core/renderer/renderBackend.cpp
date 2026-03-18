@@ -181,6 +181,19 @@ namespace core
             return false;
         }
 
+        // 创建全屏三角形VAO, 用于绘制全屏纹理
+        if (mFullscreenTriangleVAO == 0)
+            glGenVertexArrays(1, &mFullscreenTriangleVAO);
+
+        if (mFullscreenTriangleVAO == 0) // 全屏三角形VAO创建失败
+        {
+            GL_CRITICAL("[RenderBackend] Init Failed: Fullscreen Triangle VAO Creation Failed");
+            mFrameBlockUBO = UniformBuffer{};
+            mLightBlockUBO = UniformBuffer{};
+            mInitialized = false;
+            return false;
+        }
+
         // 初始化状态缓存和光照缓存
         mStateCache.Reset();
         mCachedDirectionalCount = std::numeric_limits<uint32_t>::max();
@@ -207,6 +220,12 @@ namespace core
         mProgramBlockBoundCache.clear();
         mInitialized = false;
         mHasAppliedState = false;
+
+        if (mFullscreenTriangleVAO != 0)
+        {
+            glDeleteVertexArrays(1, &mFullscreenTriangleVAO);
+            mFullscreenTriangleVAO = 0;
+        }
     }
 
     void RenderBackend::BeginRenderTarget(const FrameBuffer *target, bool clearColor, bool clearDepth, bool clearStencil)
@@ -682,5 +701,24 @@ namespace core
     void RenderBackend::ApplyPassState(const RenderStateDesc &state)
     {
         ApplyRenderState(state);
+    }
+
+    void RenderBackend::DrawFullscreenTexture(const Shader &shader, GLuint colorTexture, RenderProfiler &stats)
+    {
+        if (colorTexture == 0 || mFullscreenTriangleVAO == 0)
+            return;
+
+        if (mStateCache.UseProgram(shader.GetID()))
+            ++stats.__programBinds__;
+
+        if (mStateCache.BindTexture2D(0u, colorTexture))
+            ++stats.__textureBinds__;
+
+        shader.SetInt("uSceneSampler", 0); // 设置场景颜色采样器
+        mStateCache.BindVertexArray(mFullscreenTriangleVAO);
+
+        glDrawArrays(GL_TRIANGLES, 0, 3); // 绘制全屏三角形
+        ++stats.__drawCalls__;
+        ++stats.__triangles__;
     }
 }
