@@ -1,9 +1,7 @@
 ﻿#include "texture.hpp"
 #include "utils/logger.hpp"
-
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
-
 #include <cstring>
 #include <filesystem>
 #include <utility>
@@ -26,6 +24,8 @@ namespace core
 
         mWidth = 0;
         mHeight = 0;
+        mUnit = 0;
+        mTarget = GL_TEXTURE_2D;
     }
 
     bool Texture::UploadRGBA8(const unsigned char *pixels, uint32_t width, uint32_t height, const CreateInfo &info) noexcept
@@ -47,7 +47,10 @@ namespace core
                      GL_RGBA,                      // 输入像素格式
                      GL_UNSIGNED_BYTE,             // 输入像素数据类型
                      pixels);                      // 像素数据指针
-        glGenerateMipmap(GL_TEXTURE_2D);           // 生成mipmap链
+
+        mTarget = GL_TEXTURE_2D;
+        if (NeedsMipmap(info.__minFilter__))
+            glGenerateMipmap(GL_TEXTURE_2D); // 生成mipmap链
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, info.__wrapS__);         // S方向环绕模式
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, info.__wrapT__);         // T方向环绕模式
@@ -58,6 +61,62 @@ namespace core
         mWidth = width;
         mHeight = height;
         return true;
+    }
+
+    bool Texture::UploadCubemapRGBA8(const std::array<const unsigned char *, 6> &facePixels, uint32_t width, uint32_t height) noexcept
+    {
+        if (width == 0 || height == 0)
+            return false;
+
+        for (const auto *p : facePixels) // 检查每个面的像素数据是否为空
+        {
+            if (!p)
+                return false;
+        }
+
+        if (mTextureID == 0)
+            glGenTextures(1, &mTextureID);
+
+        mTarget = GL_TEXTURE_CUBE_MAP;
+
+        glBindTexture(GL_TEXTURE_CUBE_MAP, mTextureID);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+        for (size_t i = 0; i < facePixels.size(); ++i)
+        {
+            glTexImage2D(static_cast<GLenum>(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i),
+                         0,
+                         GL_RGBA8,
+                         static_cast<GLsizei>(width),
+                         static_cast<GLsizei>(height),
+                         0,
+                         GL_RGBA,
+                         GL_UNSIGNED_BYTE,
+                         facePixels[i]);
+        }
+
+        glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+
+        // 固定最佳状态
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+
+        glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
+        mWidth = width;
+        mHeight = height;
+        return true;
+    }
+
+    bool Texture::NeedsMipmap(GLint minFilter) noexcept
+    {
+        return minFilter == GL_NEAREST_MIPMAP_NEAREST ||
+               minFilter == GL_LINEAR_MIPMAP_NEAREST ||
+               minFilter == GL_NEAREST_MIPMAP_LINEAR ||
+               minFilter == GL_LINEAR_MIPMAP_LINEAR;
     }
 
     std::filesystem::path Texture::ResolveTexturePath(const std::filesystem::path &path, const std::filesystem::path &baseDir)
@@ -232,5 +291,96 @@ namespace core
     Texture::~Texture()
     {
         Release();
+    }
+
+    std::shared_ptr<Texture> Texture::CreatePanorama(const std::filesystem::path &path, const std::filesystem::path &baseDir)
+    {
+        CreateInfo info{};
+        info.__flipY__ = true;
+        info.__wrapS__ = GL_REPEAT;
+        info.__wrapT__ = GL_CLAMP_TO_EDGE;
+        info.__magFilter__ = GL_LINEAR;
+        info.__minFilter__ = GL_LINEAR;
+
+        auto tex = std::make_shared<Texture>(path, 0u, baseDir, info);
+        if (!tex->IsValid())
+            return nullptr;
+        return tex;
+    }
+
+    std::shared_ptr<Texture> Texture::CreateCubemap(const std::array<std::filesystem::path, 6> &cubeFacePaths, const std::filesystem::path &baseDir)
+    {
+        std::array<unsigned char *, 6> pixels{nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+        int width = 0;
+        int height = 0;
+        bool ok = true;
+        std::string debugName{};
+
+        auto freeFaces = [&pixels]()
+        {
+            for (auto *p : pixels)
+            {
+                if (p)
+                    stbi_image_free(p);
+            }
+        };
+
+        stbi_set_flip_vertically_on_load(0);
+
+        for (size_t i = 0; i < cubeFacePaths.size(); ++i)
+        {
+            const std::filesystem::path resolved = ResolveTexturePath(cubeFacePaths[i], baseDir);
+            if (i == 0)
+                debugName = resolved.parent_path().generic_string();
+
+            int w = 0;
+            int h = 0;
+            int c = 0;
+            pixels[i] = stbi_load(resolved.string().c_str(), &w, &h, &c, STBI_rgb_alpha);
+
+            if (!pixels[i])
+            {
+                GL_ERROR("[Texture] Cubemap Face Load Failed: {} | {}",
+                         resolved.string(),
+                         stbi_failure_reason() ? stbi_failure_reason() : "Unknown");
+                ok = false;
+                break;
+            }
+
+            if (i == 0)
+            {
+                width = w;
+                height = h;
+            }
+            else if (w != width || h != height)
+            {
+                GL_ERROR("[Texture] Cubemap Face Size Mismatch: {} ({}x{}), Expected ({}x{})",
+                         resolved.string(), w, h, width, height);
+                ok = false;
+                break;
+            }
+        }
+
+        if (!ok || width <= 0 || height <= 0)
+        {
+            freeFaces();
+            return nullptr;
+        }
+
+        auto tex = std::shared_ptr<Texture>(new Texture());
+        tex->mUnit = 0u;
+        tex->mDebugName = std::move(debugName);
+
+        std::array<const unsigned char *, 6> facePtrs{pixels[0], pixels[1], pixels[2], pixels[3], pixels[4], pixels[5]};
+
+        if (!tex->UploadCubemapRGBA8(facePtrs, static_cast<uint32_t>(width), static_cast<uint32_t>(height)))
+        {
+            GL_ERROR("[Texture] Cubemap Upload Failed: {}", tex->mDebugName);
+            freeFaces();
+            return nullptr;
+        }
+
+        freeFaces();
+        return tex;
     }
 }

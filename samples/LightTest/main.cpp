@@ -12,6 +12,7 @@
 #include <light/light.hpp>
 #include <shader/shader.hpp>
 #include <texture/texture.hpp>
+#include <texture/environmentMap.hpp>
 #include <utils/logger.hpp>
 
 #include <imgui.h>
@@ -22,7 +23,6 @@
 std::unique_ptr<core::Renderer> renderer = nullptr;
 std::shared_ptr<core::Camera> camera = nullptr;
 std::unique_ptr<core::CameraController> controller = nullptr;
-std::shared_ptr<core::Shader> phongShader = nullptr;
 
 std::unique_ptr<core::Scene> scene = nullptr;
 core::EntityID boxID = core::InvalidEntityID;
@@ -34,6 +34,13 @@ core::Entity *fbxRoot = nullptr;
 core::LightID mainDirLightID = core::InvalidLightID;
 core::LightID pointLightID = core::InvalidLightID;
 core::LightID spotLightID = core::InvalidLightID;
+
+// skybox
+std::shared_ptr<core::EnvironmentMap> skyboxCube = nullptr;
+std::shared_ptr<core::EnvironmentMap> skyboxPanorama = nullptr;
+bool skyboxEnabled = true;
+int skyboxSource = 0; // 0: cubemap, 1: panorama
+float skyboxIntensity = 1.f;
 
 void BuildLights()
 {
@@ -60,10 +67,11 @@ void BuildLights()
 void ScenePrepare()
 {
     /* 着色器编译阶段 */
-    phongShader = std::make_shared<core::Shader>("phong/phong.vert", "phong/phong.frag");
+    auto phongShader = std::make_shared<core::Shader>("phong/phong.vert", "phong/phong.frag");
+    auto edgeShader = std::make_shared<core::Shader>("effect/edge.vert", "effect/edge.frag");
     auto boxMaterial = std::make_shared<core::Material>(phongShader);
     auto windowMaterial = std::make_shared<core::Material>(phongShader);
-    auto edgeMaterial = std::make_shared<core::Material>(phongShader);
+    auto edgeMaterial = std::make_shared<core::Material>(edgeShader);
 
     /* 几何生成阶段 */
     auto cube = core::Mesh::CreateCube(1.f);
@@ -145,6 +153,41 @@ void ScenePrepare()
         }
     }
 
+    /* Skybox阶段 */
+    skyboxCube = std::make_shared<core::EnvironmentMap>(
+        std::array<std::filesystem::path, 6>{
+            "skybox/lake/right.jpg",  // +X
+            "skybox/lake/left.jpg",   // -X
+            "skybox/lake/top.jpg",    // +Y
+            "skybox/lake/bottom.jpg", // -Y
+            "skybox/lake/back.jpg",   // +Z
+            "skybox/lake/front.jpg"   // -Z
+        },
+        std::filesystem::path{});
+
+    skyboxPanorama = std::make_shared<core::EnvironmentMap>("skybox/dream.jpg", std::filesystem::path{});
+
+    if (skyboxCube && skyboxCube->IsValid())
+    {
+        skyboxSource = 0;
+        scene->SetSkybox(skyboxCube);
+        skyboxEnabled = true;
+    }
+    else if (skyboxPanorama && skyboxPanorama->IsValid())
+    {
+        skyboxSource = 1;
+        scene->SetSkybox(skyboxPanorama);
+        skyboxEnabled = true;
+    }
+    else
+    {
+        skyboxEnabled = false;
+        scene->ClearSkybox();
+    }
+
+    scene->SetSkyboxEnabled(skyboxEnabled);
+    scene->SetSkyboxIntensity(skyboxIntensity);
+
     /* 光源设置阶段 */
     BuildLights();
 }
@@ -206,17 +249,28 @@ int main()
         ImGui::Begin("Settings");
         ImGui::ColorEdit3("Clear Color", glm::value_ptr(clearColor));
 
+        ImGui::Separator();
         ImGui::SliderFloat3("Box Position", glm::value_ptr(boxPos), -5.f, 5.f);
         ImGui::SliderFloat3("Box Rotation", glm::value_ptr(boxRot), -180.f, 180.f);
         ImGui::SliderFloat3("Box Scale", glm::value_ptr(boxScale), 0.1f, 5.f);
 
+        ImGui::Separator();
         ImGui::SliderFloat3("Obj Position", glm::value_ptr(objPos), -5.f, 5.f);
         ImGui::SliderFloat3("Obj Rotation", glm::value_ptr(objRot), -180.f, 180.f);
         ImGui::SliderFloat3("Obj Scale", glm::value_ptr(objScale), 0.1f, 5.f);
 
+        ImGui::Separator();
         ImGui::SliderFloat3("Fbx Position", glm::value_ptr(fbxPos), -5.f, 5.f);
         ImGui::SliderFloat3("Fbx Rotation", glm::value_ptr(fbxRot), -180.f, 180.f);
         ImGui::SliderFloat3("Fbx Scale", glm::value_ptr(fbxScale), 0.1f, 5.f);
+
+        ImGui::Separator();
+        ImGui::Text("Skybox");
+        ImGui::Checkbox("Skybox Enabled", &skyboxEnabled);
+        ImGui::SliderFloat("Skybox Intensity", &skyboxIntensity, 0.f, 4.f);
+
+        const char *skyboxItems[] = {"Cubemap (6 Faces)", "Panorama (1 Image)"};
+        ImGui::Combo("Skybox Source", &skyboxSource, skyboxItems, IM_ARRAYSIZE(skyboxItems));
         ImGui::End();
 
         scene->GetEntity(boxID)->GetTransform().SetPosition(boxPos);
@@ -230,6 +284,24 @@ int main()
         fbxRoot->GetTransform().SetPosition(fbxPos);
         fbxRoot->GetTransform().SetEulerXyzDeg(fbxRot);
         fbxRoot->GetTransform().SetScale(fbxScale);
+
+        if (skyboxSource == 0)
+        {
+            if (skyboxCube && skyboxCube->IsValid())
+                scene->SetSkybox(skyboxCube);
+            else
+                skyboxEnabled = false;
+        }
+        else
+        {
+            if (skyboxPanorama && skyboxPanorama->IsValid())
+                scene->SetSkybox(skyboxPanorama);
+            else
+                skyboxEnabled = false;
+        }
+
+        scene->SetSkyboxEnabled(skyboxEnabled);
+        scene->SetSkyboxIntensity(skyboxIntensity);
 
         renderer->SetClearColor(clearColor);
         renderer->Render(*scene, *camera, static_cast<float>(glfwGetTime()));

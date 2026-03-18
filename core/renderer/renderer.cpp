@@ -1,5 +1,6 @@
 ﻿#include "renderer.hpp"
 #include "pass/forwardOpaquePass.hpp"
+#include "pass/skyboxPass.hpp"
 #include "pass/forwardTransparentPass.hpp"
 #include "pass/postProcessPass.hpp"
 #include "utils/logger.hpp"
@@ -59,6 +60,7 @@ namespace core
 
         mGraph.Reset();
         mGraph.AddPass(std::make_unique<ForwardOpaquePass>());
+        mGraph.AddPass(std::make_unique<SkyboxPass>());
         mGraph.AddPass(std::make_unique<ForwardTransparentPass>());
         mGraph.AddPass(std::make_unique<PostProcessPass>());
 

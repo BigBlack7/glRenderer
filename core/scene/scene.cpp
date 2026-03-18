@@ -1,4 +1,6 @@
 ﻿#include "scene.hpp"
+#include "texture/environmentMap.hpp"
+#include <algorithm>
 
 namespace core
 {
@@ -232,5 +234,28 @@ namespace core
         if (!IsValidID(id))
             return Identity;
         return mNodes[id].__worldNormalMatrix__;
+    }
+
+    void Scene::SetSkybox(std::shared_ptr<EnvironmentMap> skybox) noexcept
+    {
+        mSkybox = std::move(skybox);
+        if (!mSkybox || !mSkybox->IsValid())
+            mSkyboxEnabled = false;
+    }
+
+    void Scene::ClearSkybox() noexcept
+    {
+        mSkybox.reset();
+        mSkyboxEnabled = false;
+    }
+
+    bool Scene::IsSkyboxEnabled() const noexcept
+    {
+        return mSkyboxEnabled && mSkybox && mSkybox->IsValid();
+    }
+
+    void Scene::SetSkyboxIntensity(float intensity) noexcept
+    {
+        mSkyboxIntensity = std::max(0.f, intensity);
     }
 }

@@ -19,6 +19,7 @@ namespace core
     class Material;
     class Mesh;
     class Shader;
+    class EnvironmentMap;
 
     class RenderBackend final
     {
@@ -124,6 +125,14 @@ namespace core
         /// @param colorTexture 颜色纹理
         /// @param stats 渲染性能统计
         void DrawFullscreenTexture(const Shader &shader, GLuint colorTexture, RenderProfiler &stats);
+
+        /// @brief 绘制天空盒(支持cubemap和panorama)
+        /// @param shader 着色器程序
+        /// @param cube 天空盒立方体网格
+        /// @param skybox 环境贴图(立方体贴图或全景图)
+        /// @param intensity 天空盒强度
+        /// @param stats 渲染性能统计
+        void DrawSkybox(const Shader &shader, const Mesh &cube, const EnvironmentMap &skybox, float intensity, RenderProfiler &stats);
 
         void SetClearColor(const glm::vec4 &color) { mClearColor = color; }
         const glm::vec4 &GetClearColor() const noexcept { return mClearColor; }

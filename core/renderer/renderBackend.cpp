@@ -3,6 +3,7 @@
 #include "geometry/mesh.hpp"
 #include "light/light.hpp"
 #include "material/material.hpp"
+#include "texture/environmentMap.hpp"
 #include "shader/shader.hpp"
 #include "texture/texture.hpp"
 #include "utils/logger.hpp"
@@ -207,6 +208,9 @@ namespace core
         // 初始化默认渲染状态 - 不透明状态
         mHasAppliedState = false;
         ApplyRenderState(MakeOpaqueState());
+
+        // 启用立方体贴图无缝采样
+        glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
         mInitialized = true;
         return true;
@@ -720,5 +724,39 @@ namespace core
         glDrawArrays(GL_TRIANGLES, 0, 3); // 绘制全屏三角形
         ++stats.__drawCalls__;
         ++stats.__triangles__;
+    }
+
+    void RenderBackend::DrawSkybox(const Shader &shader, const Mesh &cube, const EnvironmentMap &skybox, float intensity, RenderProfiler &stats)
+    {
+        if (!skybox.IsValid() || !cube.IsValid())
+            return;
+
+        if (mStateCache.UseProgram(shader.GetID()))
+            ++stats.__programBinds__;
+
+        BindProgramBlocks(shader);
+
+        constexpr uint32_t cubeUnit = 0u;
+        constexpr uint32_t panoUnit = 1u;
+
+        shader.SetInt("uSkyboxCube", static_cast<int>(cubeUnit));
+        shader.SetInt("uSkyboxPanorama", static_cast<int>(panoUnit));
+        shader.SetInt("uSkyMode", skybox.IsCubeMap() ? 0 : 1);
+        shader.SetFloat("uSkyboxIntensity", intensity);
+
+        if (skybox.IsCubeMap())
+        {
+            if (mStateCache.BindTexture2D(cubeUnit, skybox.GetID()))
+                ++stats.__textureBinds__;
+            mStateCache.BindTexture2D(panoUnit, 0);
+        }
+        else
+        {
+            mStateCache.BindTexture2D(cubeUnit, 0);
+            if (mStateCache.BindTexture2D(panoUnit, skybox.GetID()))
+                ++stats.__textureBinds__;
+        }
+
+        DrawMesh(cube, stats);
     }
 }

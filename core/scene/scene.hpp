@@ -30,6 +30,11 @@ namespace core
 
         class LightManager mLightManager{};
 
+        // 环境贴图
+        std::shared_ptr<class EnvironmentMap> mSkybox{};
+        bool mSkyboxEnabled{false};
+        float mSkyboxIntensity{1.f};
+
     private:
         /// @brief 检查实体ID是否有效
         /// @param id 实体ID
@@ -150,6 +155,18 @@ namespace core
         void ClearSpotLights() { return mLightManager.ClearLights<SpotLight>(); }
 
         //=====================================灯光系统=================================================
+
+        //=====================================天空盒系统=================================================
+        void SetSkybox(std::shared_ptr<class EnvironmentMap> skybox) noexcept;
+        void ClearSkybox() noexcept;
+        [[nodiscard]] const std::shared_ptr<class EnvironmentMap> &GetSkybox() const noexcept { return mSkybox; }
+
+        void SetSkyboxEnabled(bool enabled) noexcept { mSkyboxEnabled = enabled; }
+        [[nodiscard]] bool IsSkyboxEnabled() const noexcept;
+
+        void SetSkyboxIntensity(float intensity) noexcept;
+        [[nodiscard]] float GetSkyboxIntensity() const noexcept { return mSkyboxIntensity; }
+        //=====================================天空盒系统=================================================
 
         /// @brief 遍历所有可渲染实体
         /// @tparam Fn 函数对象类型, 必须接受(EntityID, const Entity &, const glm::mat4 &, const glm::mat3 &)作为参数

@@ -4,6 +4,8 @@
 #include <filesystem>
 #include <span>
 #include <string>
+#include <array>
+#include <memory>
 
 namespace core
 {
@@ -15,6 +17,7 @@ namespace core
         uint32_t mHeight{0};
         uint32_t mUnit{0};
         std::string mDebugName{};
+        GLenum mTarget{GL_TEXTURE_2D};
 
     public:
         struct CreateInfo final
@@ -27,6 +30,8 @@ namespace core
         };
 
     private:
+        Texture() = default;
+
         /// @brief 释放纹理资源
         void Release() noexcept;
 
@@ -37,6 +42,18 @@ namespace core
         /// @param info
         /// @return
         bool UploadRGBA8(const unsigned char *pixels, uint32_t width, uint32_t height, const CreateInfo &info) noexcept;
+
+        /// @brief 上传CubeMap RGBA8格式像素数据到GPU
+        /// @param facePixels - 6个面的像素数据，顺序为 +X(right), -X(left), +Y(top), -Y(bottom), +Z(back), -Z(front)
+        /// @param width 每个面的宽度
+        /// @param height 每个面的高度
+        /// @return 是否上传成功
+        bool UploadCubemapRGBA8(const std::array<const unsigned char *, 6> &facePixels, uint32_t width, uint32_t height) noexcept;
+
+        /// @brief 判断是否需要生成Mipmap
+        /// @param minFilter 最小过滤参数
+        /// @return 是否需要生成Mipmap
+        static bool NeedsMipmap(GLint minFilter) noexcept;
 
         /// @brief 解析纹理文件路径
         /// @param path 纹理文件路径
@@ -97,6 +114,11 @@ namespace core
         uint32_t GetHeight() const { return mHeight; }
         GLuint GetID() const { return mTextureID; }
         uint32_t GetUnit() const { return mUnit; }
+        GLenum GetTarget() const noexcept { return mTarget; }
         const std::string &GetDebugName() const noexcept { return mDebugName; }
+
+        // Environment Map
+        static std::shared_ptr<Texture> CreatePanorama(const std::filesystem::path &path, const std::filesystem::path &baseDir = {});
+        static std::shared_ptr<Texture> CreateCubemap(const std::array<std::filesystem::path, 6> &cubeFacePaths, const std::filesystem::path &baseDir = {});
     };
 }
