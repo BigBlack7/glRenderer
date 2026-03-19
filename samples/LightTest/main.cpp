@@ -45,7 +45,7 @@ float skyboxIntensity = 1.f;
 void BuildLights()
 {
     core::DirectionalLight mainLight; // 创建定向光
-    mainLight.SetDirection(glm::vec3(0.f, 0.f, -1.f));
+    mainLight.SetDirection(glm::vec3(-1.f, -1.f, -1.f));
     mainLight.SetColor(glm::vec3(1.f, 1.f, 1.f));
     mainLight.SetIntensity(0.9f);
     mainDirLightID = scene->CreateDirectionalLight(mainLight);
@@ -140,16 +140,14 @@ void ScenePrepare()
     core::ModelLoadOptions fbxOpt{};
     fbxOpt.__shader__ = phongShader;
     fbxOpt.__flipTextureY__ = true;
-    fbxOpt.__globalTextureOverrides__[core::TextureSlot::Albedo] = "grass/grass.jpg";
-    fbxOpt.__globalTextureOverrides__[core::TextureSlot::OpacityMask] = "grass/grassMask.png";
-    auto fbxModel = core::ModelLoader::Load("grass.fbx", fbxOpt);
+    auto fbxModel = core::ModelLoader::Load("fist.fbx", fbxOpt);
     if (fbxModel)
     {
-        auto fbxInstance = fbxModel->Instantiate(*scene, "Grass");
+        auto fbxInstance = fbxModel->Instantiate(*scene, "Fist");
         if ((fbxRoot = scene->GetEntity(fbxInstance.__rootEntity__)))
         {
             fbxRoot->GetTransform().SetPosition(glm::vec3(2.5f, 0.f, 0.f));
-            fbxRoot->GetTransform().SetScale(glm::vec3(0.5f));
+            fbxRoot->GetTransform().SetScale(glm::vec3(0.008f));
         }
     }
 
@@ -201,7 +199,7 @@ glm::vec3 objRot{0.f, 0.f, 0.f};
 glm::vec3 objScale{0.5f};
 glm::vec3 fbxPos{2.5f, 0.f, 0.f};
 glm::vec3 fbxRot{0.f, 0.f, 0.f};
-glm::vec3 fbxScale{0.002f};
+glm::vec3 fbxScale{0.008f};
 
 void initIMGUI(GLFWwindow *window)
 {

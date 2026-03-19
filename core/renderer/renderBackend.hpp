@@ -5,7 +5,9 @@
 #include "renderQueue.hpp"
 #include "renderStateCache.hpp"
 #include "renderOption.hpp"
+#include "buffer/instanceBuffer.hpp"
 #include "profiler.hpp"
+#include <vector>
 #include <array>
 #include <cstdint>
 #include <limits>
@@ -30,6 +32,13 @@ namespace core
         UniformBuffer mLightBlockUBO{};                        // 光照数据UBO(变化时更新)
 
         RenderStateCache mStateCache{}; // 状态缓存避免冗余的OpenGL状态切换
+
+        InstanceBuffer mInstanceModelBuffer{};  // 每实例 world matrix
+        InstanceBuffer mInstanceNormalBuffer{}; // 每实例 normal matrix(3列vec4)
+
+        std::unordered_set<GLuint> mInstancedLayoutCache{}; // 已配置实例布局的VAO缓存
+        std::vector<glm::mat4> mInstanceModelScratch{};     // 上传前临时缓存
+        std::vector<glm::vec4> mInstanceNormalScratch{};    // 每实例3个vec4
 
         uint32_t mCachedDirectionalCount{std::numeric_limits<uint32_t>::max()};  // 缓存的定向光数量
         std::array<uint64_t, MaxDirectionalLights> mCachedDirectionalVersions{}; // 平行光源的版本号缓存
@@ -71,6 +80,26 @@ namespace core
         /// @param items 绘制项数组
         /// @param stats 渲染性能统计
         void DrawItems(std::span<const DrawItem> items, RenderProfiler &stats);
+
+        /// @brief 确保实例布局已配置
+        /// @param mesh 网格对象
+        void EnsureInstancedLayout(const Mesh &mesh);
+
+        /// @brief 上传实例数据到缓冲区
+        /// @param items 绘制项数组
+        /// @return 是否上传成功
+        bool UploadInstanceData(std::span<const DrawItem> items);
+
+        /// @brief 绘制实例化网格几何体
+        /// @param mesh 网格对象
+        /// @param instanceCount 实例数量
+        /// @param stats 渲染性能统计
+        void DrawMeshInstanced(const Mesh &mesh, uint32_t instanceCount, RenderProfiler &stats);
+        
+        /// @brief 绘制实例化物体列表, 适用于大量实例共享同一Mesh/Material的情况, 减少DrawCall数量
+        /// @param items 绘制项数组
+        /// @param stats 渲染性能统计
+        void DrawInstancedItems(std::span<const DrawItem> items, RenderProfiler &stats);
 
     public:
         /// @brief 初始化渲染后端, 创建UBO并设置基础OpenGL状态

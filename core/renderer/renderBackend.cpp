@@ -8,6 +8,7 @@
 #include "texture/texture.hpp"
 #include "utils/logger.hpp"
 #include <limits>
+#include <cstdint>
 
 namespace core
 {
@@ -205,6 +206,10 @@ namespace core
         mCachedSpotVersions.fill(std::numeric_limits<uint64_t>::max());
         mProgramBlockBoundCache.clear();
 
+        mInstancedLayoutCache.clear();
+        mInstanceModelScratch.clear();
+        mInstanceNormalScratch.clear();
+
         // 初始化默认渲染状态 - 不透明状态
         mHasAppliedState = false;
         ApplyRenderState(MakeOpaqueState());
@@ -220,8 +225,13 @@ namespace core
     {
         mFrameBlockUBO = UniformBuffer{};
         mLightBlockUBO = UniformBuffer{};
+        mInstanceModelBuffer = InstanceBuffer{};
+        mInstanceNormalBuffer = InstanceBuffer{};
         mStateCache.Reset();
         mProgramBlockBoundCache.clear();
+        mInstancedLayoutCache.clear();
+        mInstanceModelScratch.clear();
+        mInstanceNormalScratch.clear();
         mInitialized = false;
         mHasAppliedState = false;
 
@@ -682,6 +692,7 @@ namespace core
             {
                 ApplyRenderState(material.GetRenderState());
                 ApplyMaterial(material, shader, stats);
+                shader.SetUInt("uUseInstancing", 0u);
                 lastMaterial = &material;
                 lastMaterialVersion = material.GetVersion();
             }
@@ -692,9 +703,174 @@ namespace core
         }
     }
 
+    void RenderBackend::EnsureInstancedLayout(const Mesh &mesh)
+    {
+        const GLuint vao = mesh.GetVAO();
+        if (vao == 0 || !mInstanceModelBuffer.IsValid() || !mInstanceNormalBuffer.IsValid()) // 如果VAO无效或实例化缓冲区未初始化直接返回
+            return;
+
+        if (mInstancedLayoutCache.find(vao) != mInstancedLayoutCache.end()) // 如果该VAO的实例化布局已经设置过跳过重复设置
+            return;
+
+        mStateCache.BindVertexArray(vao); // 绑定当前网格的VAO到OpenGL状态
+
+        // 设置模型矩阵属性
+        mInstanceModelBuffer.Bind();
+        constexpr GLsizei modelStride = static_cast<GLsizei>(sizeof(glm::mat4)); // 单个模型矩阵的字节跨度(64字节)
+        for (uint32_t col = 0u; col < 4u; ++col)                                 // 遍历矩阵的4个列向量
+        {
+            const GLuint location = 3u + col;                                         // 属性位置从3开始(0-2是位置/法线/UV)
+            const uintptr_t offset = static_cast<uintptr_t>(sizeof(glm::vec4) * col); // 当前列的偏移量
+
+            glEnableVertexAttribArray(location);
+            glVertexAttribPointer(location, 4, GL_FLOAT, GL_FALSE, modelStride, reinterpret_cast<const void *>(offset));
+            glVertexAttribDivisor(location, 1u);
+        }
+
+        // 设置法线矩阵属性
+        mInstanceNormalBuffer.Bind();
+        constexpr GLsizei normalStride = static_cast<GLsizei>(sizeof(glm::vec4) * 3u); // 法线矩阵的字节跨度(48字节, 实际是3x3矩阵)
+        for (uint32_t col = 0u; col < 3u; ++col)                                       // 遍历法线矩阵的3个列向量
+        {
+            const GLuint location = 7u + col; // 属性位置从7开始(接在模型矩阵之后)
+            const uintptr_t offset = static_cast<uintptr_t>(sizeof(glm::vec4) * col);
+
+            glEnableVertexAttribArray(location);
+            glVertexAttribPointer(location, 4, GL_FLOAT, GL_FALSE, normalStride, reinterpret_cast<const void *>(offset));
+            glVertexAttribDivisor(location, 1u);
+        }
+
+        InstanceBuffer::Unbind();
+        mInstancedLayoutCache.insert(vao); // 将该VAO标记为已设置实例化布局
+    }
+
+    bool RenderBackend::UploadInstanceData(std::span<const DrawItem> items)
+    {
+        if (items.empty()) // 如果没有绘制项直接返回失败
+            return false;
+
+        // 准备模型矩阵和法线矩阵数据
+        mInstanceModelScratch.clear();
+        mInstanceNormalScratch.clear();
+        mInstanceModelScratch.reserve(items.size());
+        mInstanceNormalScratch.reserve(items.size() * 3u);
+
+        for (const DrawItem &item : items)
+        {
+            mInstanceModelScratch.push_back(item.__world__); // 收集世界变换矩阵
+
+            // 收集法线矩阵, 0填充按16字节对齐
+            const glm::mat3 &n = item.__normal__;
+            mInstanceNormalScratch.emplace_back(n[0], 0.f);
+            mInstanceNormalScratch.emplace_back(n[1], 0.f);
+            mInstanceNormalScratch.emplace_back(n[2], 0.f);
+        }
+
+        // 上传模型矩阵数据
+        const bool modelOk = mInstanceModelBuffer.Upload(mInstanceModelScratch.data(), mInstanceModelScratch.size() * sizeof(glm::mat4));
+        // 上传法线矩阵数据
+        const bool normalOk = mInstanceNormalBuffer.Upload(mInstanceNormalScratch.data(), mInstanceNormalScratch.size() * sizeof(glm::vec4));
+
+        return modelOk && normalOk;
+    }
+
+    void RenderBackend::DrawMeshInstanced(const Mesh &mesh, uint32_t instanceCount, RenderProfiler &stats)
+    {
+        if (instanceCount == 0u || mesh.GetVAO() == 0u || mesh.GetVertexCount() == 0u) // 无效参数检查
+            return;
+
+        mStateCache.BindVertexArray(mesh.GetVAO());
+
+        if (mesh.GetIndexCount() > 0u) // 如果网格有索引数据使用索引实例化渲染
+        {
+            glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(mesh.GetIndexCount()), GL_UNSIGNED_INT, nullptr, static_cast<GLsizei>(instanceCount));
+            stats.__triangles__ += (mesh.GetIndexCount() / 3u) * instanceCount;
+        }
+        else // 如果网格没有索引数据使用顶点实例化渲染
+        {
+            glDrawArraysInstanced(GL_TRIANGLES, 0, static_cast<GLsizei>(mesh.GetVertexCount()), static_cast<GLsizei>(instanceCount));
+            stats.__triangles__ += (mesh.GetVertexCount() / 3u) * instanceCount;
+        }
+
+        ++stats.__drawCalls__;
+    }
+
+    void RenderBackend::DrawInstancedItems(std::span<const DrawItem> items, RenderProfiler &stats)
+    {
+        if (items.empty()) // 没有绘制项直接返回
+            return;
+
+        const DrawItem &head = items.front();                         // 获取第一个绘制项作为参考
+        if (!head.__shader__ || !head.__material__ || !head.__mesh__) // 如果着色器/材质/网格任一无效直接返回
+            return;
+
+        // 一致性检查确保所有绘制项使用相同的资源组合
+        for (const DrawItem &item : items)
+        {
+            if (item.__shader__ != head.__shader__ ||
+                item.__material__ != head.__material__ ||
+                item.__mesh__ != head.__mesh__)
+            {
+                DrawItems(items, stats); // 发现不一致时, 退回到普通逐个绘制模式
+                return;
+            }
+        }
+
+        const Shader &shader = *head.__shader__;
+        const Material &material = *head.__material__;
+
+        if (mStateCache.UseProgram(shader.GetID()))
+            ++stats.__programBinds__;
+
+        BindProgramBlocks(shader);
+        ApplyRenderState(material.GetRenderState());
+        ApplyMaterial(material, shader, stats);
+
+        shader.SetUInt("uUseInstancing", 1u); // 通知着色器启用实例化渲染
+
+        if (!UploadInstanceData(items)) // 上传实例化数据到GPU缓冲区
+        {
+            // 数据上传失败时, 退回到普通绘制模式
+            shader.SetUInt("uUseInstancing", 0u); // 关闭实例化标志
+            DrawItems(items, stats);
+            return;
+        }
+
+        EnsureInstancedLayout(*head.__mesh__);
+        DrawMeshInstanced(*head.__mesh__, static_cast<uint32_t>(items.size()), stats);
+
+        shader.SetUInt("uUseInstancing", 0u); // 重置实例化标志避免影响后续绘制
+    }
+
     void RenderBackend::DrawOpaqueQueue(const RenderQueue &queue, RenderProfiler &stats)
     {
-        DrawItems(queue.GetOpaqueItems(), stats);
+        const auto &items = queue.GetOpaqueItems();
+        const auto &batches = queue.GetOpaqueBatches();
+
+        if (items.empty())
+            return;
+
+        if (batches.empty()) // 没有批次信息退回到普通逐个绘制模式
+        {
+            DrawItems(items, stats);
+            return;
+        }
+
+        constexpr uint32_t MinInstanceCount = 4u; // 最小实例化阈值: 只有≥4个相同物体才启用实例化
+
+        for (const DrawBatch &batch : batches)
+        {
+            if (batch.__count__ == 0u) // 跳过空批次
+                continue;
+
+            const DrawItem *begin = items.data() + batch.__start__; // 计算批次起始指针
+            std::span<const DrawItem> batchItems(begin, batch.__count__); // 创建批次数据视图
+
+            if (batch.__count__ >= MinInstanceCount)
+                DrawInstancedItems(batchItems, stats); // 达到阈值使用实例化渲染
+            else
+                DrawItems(batchItems, stats);
+        }
     }
 
     void RenderBackend::DrawTransparentQueue(const RenderQueue &queue, RenderProfiler &stats)

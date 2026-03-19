@@ -47,6 +47,17 @@ namespace core
                 return a.__distanceToCameraSq__ > b.__distanceToCameraSq__;
             return a.__entityID__ < b.__entityID__;
         }
+
+        /// @brief 
+        /// @param a 
+        /// @param b 
+        /// @return 
+        bool HasSameOpaqueBatchKey(const DrawItem &a, const DrawItem &b)
+        {
+            return a.__shader__ == b.__shader__ &&
+                   a.__material__ == b.__material__ &&
+                   a.__mesh__ == b.__mesh__;
+        }
     }
 
     /*
@@ -109,5 +120,22 @@ namespace core
         // 按优化顺序排序, 最大化状态缓存命中率
         std::sort(mOpaqueItems.begin(), mOpaqueItems.end(), detail::CompareOpaque);
         std::sort(mTransparentItems.begin(), mTransparentItems.end(), detail::CompareTransparent);
+
+        mOpaqueBatches.clear();
+        mOpaqueBatches.reserve(mOpaqueItems.size());
+        if (!mOpaqueItems.empty())
+        {
+            uint32_t start = 0u;
+            const uint32_t itemCount = static_cast<uint32_t>(mOpaqueItems.size());
+
+            for (uint32_t i = 1u; i <= itemCount; ++i)
+            {
+                if (i == itemCount || !detail::HasSameOpaqueBatchKey(mOpaqueItems[start], mOpaqueItems[i]))
+                {
+                    mOpaqueBatches.push_back(DrawBatch{start, i - start});
+                    start = i;
+                }
+            }
+        }
     }
 }
