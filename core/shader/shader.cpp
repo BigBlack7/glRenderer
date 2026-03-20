@@ -133,20 +133,27 @@ namespace core
         return LoadShaderRecursive(fullPath, includeGuard);
     }
 
-    GLint Shader::GetUniformLocation(std::string_view name) const
+    GLint Shader::GetUniformLocation(std::string_view name, bool warnIfMissing) const
     {
         // 缓存glGetUniformLocation()的结果, 避免重复查询OpenGL驱动, 从昂贵的系统调用变为O(1)哈希表查找
         const std::string key(name);
 
         if (const auto it = mUniformLocationCache.find(key); it != mUniformLocationCache.end())
+        {
+            if (warnIfMissing && it->second < 0) // 缓存中未找到, 且要求警告
+            {
+                if (mMissingUniformWarned.insert(key).second)
+                    GL_WARN("[Shader] Uniform Not Found or Optimized Out: {}", key);
+            }
             return it->second;
+        }
 
         // 缓存未命中, 必须查询OpenGL驱动
         const GLint location = glGetUniformLocation(mProgram, key.c_str());
         // 缓存查询结果, 无论是否找到, 都缓存起来, 避免重复查询
         mUniformLocationCache.emplace(key, location);
 
-        if (location < 0)
+        if (warnIfMissing && location < 0) // 查询结果为-1, 且要求警告
         {
             // 记录未找到的uniform变量, 避免重复警告刷屏
             if (mMissingUniformWarned.insert(key).second)
@@ -157,6 +164,32 @@ namespace core
 
         // 未找到时返回-1
         return location;
+    }
+
+    GLuint Shader::GetUniformBlockIndex(std::string_view blockName, bool warnIfMissing) const
+    {
+        const std::string key(blockName);
+
+        if (const auto it = mUniformBlockIndexCache.find(key); it != mUniformBlockIndexCache.end())
+        {
+            if (warnIfMissing && it->second == GL_INVALID_INDEX)
+            {
+                if (mMissingUniformBlockWarned.insert(key).second)
+                    GL_WARN("[Shader] Uniform Block Not Found or Optimized Out: {}", key);
+            }
+            return it->second;
+        }
+
+        const GLuint blockIndex = glGetUniformBlockIndex(mProgram, key.c_str());
+        mUniformBlockIndexCache.emplace(key, blockIndex);
+
+        if (warnIfMissing && blockIndex == GL_INVALID_INDEX)
+        {
+            if (mMissingUniformBlockWarned.insert(key).second)
+                GL_WARN("[Shader] Uniform Block Not Found or Optimized Out: {}", key);
+        }
+
+        return blockIndex;
     }
 
     void Shader::Release() noexcept
@@ -213,23 +246,28 @@ namespace core
         Release();
     }
 
-    bool Shader::BindUniformBlock(std::string_view blockName, uint32_t bindingPoint) const
+    GLint Shader::FindUniformLocation(std::string_view name) const
     {
-        const std::string key(blockName);
-        const GLuint blockIndex = glGetUniformBlockIndex(mProgram, key.c_str()); // 查询Uniform Block的索引
+        return GetUniformLocation(name, false);
+    }
 
-        // 处理Uniform Block不存在的情况
+    bool Shader::HasUniform(std::string_view name) const
+    {
+        return FindUniformLocation(name) >= 0;
+    }
+
+    bool Shader::HasUniformBlock(std::string_view blockName) const
+    {
+        return GetUniformBlockIndex(blockName, false) != GL_INVALID_INDEX;
+    }
+
+    bool Shader::BindUniformBlock(std::string_view blockName, uint32_t bindingPoint, bool warnIfMissing) const
+    {
+        const GLuint blockIndex = GetUniformBlockIndex(blockName, warnIfMissing); // 查询Uniform Block的索引
+
         if (blockIndex == GL_INVALID_INDEX)
-        {
-            // 智能警告系统: 每个缺失的block只警告一次
-            if (mMissingUniformBlockWarned.insert(key).second)
-            {
-                GL_WARN("[Shader] Uniform Block Not Found or Optimized Out: {}", key);
-            }
             return false;
-        }
 
-        // 将block绑定到指定的binding point
         glUniformBlockBinding(mProgram, blockIndex, bindingPoint);
         return true;
     }
@@ -237,57 +275,115 @@ namespace core
     /* setter */
     void Shader::SetFloat(std::string_view name, float value) const
     {
-        const GLint location = GetUniformLocation(name);
-        if (location >= 0)
-            glUniform1f(location, value);
+        SetFloat(GetUniformLocation(name, true), value);
     }
 
     void Shader::SetVec3(std::string_view name, float x, float y, float z) const
     {
-        const GLint location = GetUniformLocation(name);
-        if (location >= 0)
-            glUniform3f(location, x, y, z);
+        SetVec3(GetUniformLocation(name, true), x, y, z);
     }
 
     void Shader::SetVec3(std::string_view name, const float *value) const
     {
-        const GLint location = GetUniformLocation(name);
+        const GLint location = GetUniformLocation(name, true);
         if (location >= 0)
             glUniform3fv(location, 1, value); // 第二个参数count表示要设置的vec3数量, 这里是1个vec3, 因此传入1
     }
 
     void Shader::SetVec3(std::string_view name, const glm::vec3 &value) const
     {
-        const GLint location = GetUniformLocation(name);
-        if (location >= 0)
-            glUniform3fv(location, 1, glm::value_ptr(value)); // glm::vec3在内存中是连续存储的, 可以直接传入地址
+        SetVec3(GetUniformLocation(name, true), value);
     }
 
     void Shader::SetInt(std::string_view name, int value) const
     {
-        const GLint location = GetUniformLocation(name);
-        if (location >= 0)
-            glUniform1i(location, value);
+        SetInt(GetUniformLocation(name, true), value);
     }
 
     void Shader::SetUInt(std::string_view name, uint32_t value) const
     {
-        const GLint location = GetUniformLocation(name);
-        if (location >= 0)
-            glUniform1ui(location, value);
+        SetUInt(GetUniformLocation(name, true), value);
     }
 
     void Shader::SetMat4(std::string_view name, const glm::mat4 &value) const
     {
-        const GLint location = GetUniformLocation(name);
-        if (location >= 0)
-            glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(value)); // glm::mat4在内存中是连续存储的, 可以直接传入地址; GL_FALSE表示不进行转置, 因为glm默认是列主序(OpenGL也是列主序)
+        SetMat4(GetUniformLocation(name, true), value);
     }
 
     void Shader::SetMat3(std::string_view name, const glm::mat3 &value) const
     {
-        const GLint location = GetUniformLocation(name);
+        SetMat3(GetUniformLocation(name, true), value);
+    }
+
+    void Shader::SetFloat(GLint location, float value) const
+    {
+        if (location >= 0)
+            glUniform1f(location, value);
+    }
+
+    void Shader::SetVec3(GLint location, float x, float y, float z) const
+    {
+        if (location >= 0)
+            glUniform3f(location, x, y, z);
+    }
+
+    void Shader::SetVec3(GLint location, const glm::vec3 &value) const
+    {
+        if (location >= 0)
+            glUniform3fv(location, 1, glm::value_ptr(value)); // glm::vec3在内存中是连续存储的, 可以直接传入地址
+    }
+
+    void Shader::SetInt(GLint location, int value) const
+    {
+        if (location >= 0)
+            glUniform1i(location, value);
+    }
+
+    void Shader::SetUInt(GLint location, uint32_t value) const
+    {
+        if (location >= 0)
+            glUniform1ui(location, value);
+    }
+
+    void Shader::SetMat4(GLint location, const glm::mat4 &value) const
+    {
+        if (location >= 0)
+            glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(value)); // glm::mat4在内存中是连续存储的, 可以直接传入地址; GL_FALSE表示不进行转置, 因为glm默认是列主序(OpenGL也是列主序)
+    }
+
+    void Shader::SetMat3(GLint location, const glm::mat3 &value) const
+    {
         if (location >= 0)
             glUniformMatrix3fv(location, 1, GL_FALSE, glm::value_ptr(value));
+    }
+
+    void Shader::SetFloatOptional(std::string_view name, float value) const
+    {
+        SetFloat(GetUniformLocation(name, false), value);
+    }
+
+    void Shader::SetVec3Optional(std::string_view name, const glm::vec3 &value) const
+    {
+        SetVec3(GetUniformLocation(name, false), value);
+    }
+
+    void Shader::SetIntOptional(std::string_view name, int value) const
+    {
+        SetInt(GetUniformLocation(name, false), value);
+    }
+
+    void Shader::SetUIntOptional(std::string_view name, uint32_t value) const
+    {
+        SetUInt(GetUniformLocation(name, false), value);
+    }
+
+    void Shader::SetMat4Optional(std::string_view name, const glm::mat4 &value) const
+    {
+        SetMat4(GetUniformLocation(name, false), value);
+    }
+
+    void Shader::SetMat3Optional(std::string_view name, const glm::mat3 &value) const
+    {
+        SetMat3(GetUniformLocation(name, false), value);
     }
 }

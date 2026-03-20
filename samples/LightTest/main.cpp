@@ -27,8 +27,7 @@ std::unique_ptr<core::CameraController> controller = nullptr;
 std::unique_ptr<core::Scene> scene = nullptr;
 core::EntityID boxID = core::InvalidEntityID;
 
-core::Entity *objRoot = nullptr;
-core::Entity *fbxRoot = nullptr;
+core::EntityID objRootID = core::InvalidEntityID;
 
 // 光源ID
 core::LightID mainDirLightID = core::InvalidLightID;
@@ -75,7 +74,6 @@ void ScenePrepare()
 
     /* 几何生成阶段 */
     auto cube = core::Mesh::CreateCube(1.f);
-    auto plane = core::Mesh::CreatePlane(4.f);
 
     /* 材质处理阶段 */
     auto boxTex = std::make_shared<core::Texture>("box/box.png", 0);
@@ -100,22 +98,30 @@ void ScenePrepare()
     scene = std::make_unique<core::Scene>();
 
     boxID = scene->CreateEntity("Box");
-    auto *box = scene->GetEntity(boxID);
-    box->SetMesh(cube);
-    box->SetMaterial(boxMaterial);
+    if (auto *box = scene->GetEntity(boxID))
+    {
+        box->SetMesh(cube);
+        box->SetMaterial(boxMaterial);
+    }
 
     auto windowID = scene->CreateEntity("Window");
-    auto *window = scene->GetEntity(windowID);
-    window->SetMesh(cube);
-    window->SetMaterial(windowMaterial);
-    window->GetTransform().SetPosition(glm::vec3(0.f, 0.f, 2.f));
+    if (auto *window = scene->GetEntity(windowID))
+    {
+        window->SetMesh(cube);
+        window->SetMaterial(windowMaterial);
+        window->GetTransform().SetPosition(glm::vec3(0.f, 0.f, 2.f));
+    }
 
     auto edgeID = scene->CreateEntity("Edge");
-    auto *edge = scene->GetEntity(edgeID);
-    edge->SetMesh(cube);
-    edge->SetMaterial(edgeMaterial);
-    edge->GetTransform().SetPosition(box->GetTransform().GetPosition());
-    edge->GetTransform().SetScale(glm::vec3(1.2f));
+    if (auto *edge = scene->GetEntity(edgeID))
+    {
+        edge->SetMesh(cube);
+        edge->SetMaterial(edgeMaterial);
+        edge->GetTransform().SetScale(glm::vec3(1.2f));
+
+        if (auto *box = scene->GetEntity(boxID))
+            edge->GetTransform().SetPosition(box->GetTransform().GetPosition());
+    }
     scene->Reparent(edgeID, boxID);
 
     // OBJ
@@ -130,12 +136,15 @@ void ScenePrepare()
         auto objState = core::MakeTransparentState();
         objState.mOpacity = 0.5f;
         objModel->ApplyRenderState(*scene, objInstance, objState, {});
-        if ((objRoot = scene->GetEntity(objInstance.__rootEntity__)))
+
+        objRootID = objInstance.__rootEntity__;
+        if (auto *objRoot = scene->GetEntity(objRootID))
         {
             objRoot->GetTransform().SetPosition(glm::vec3(-2.f, 0.f, 0.f));
             objRoot->GetTransform().SetScale(glm::vec3(0.5f));
         }
     }
+
     // FBX
     core::ModelLoadOptions fbxOpt{};
     fbxOpt.__shader__ = phongShader;
@@ -143,11 +152,26 @@ void ScenePrepare()
     auto fbxModel = core::ModelLoader::Load("fist.fbx", fbxOpt);
     if (fbxModel)
     {
-        auto fbxInstance = fbxModel->Instantiate(*scene, "Fist");
-        if ((fbxRoot = scene->GetEntity(fbxInstance.__rootEntity__)))
+        constexpr int gridSize = 4;
+        constexpr float spacing = 2.f;
+        const glm::vec3 gridCenter{0.f, 1.5f, 0.f};
+        const glm::vec3 fistScale{0.006f};
+
+        const float half = 0.5f * static_cast<float>(gridSize - 1);
+        for (int row = 0; row < gridSize; ++row)
         {
-            fbxRoot->GetTransform().SetPosition(glm::vec3(2.5f, 0.f, 0.f));
-            fbxRoot->GetTransform().SetScale(glm::vec3(0.008f));
+            for (int col = 0; col < gridSize; ++col)
+            {
+                auto fbxInstance = fbxModel->Instantiate(*scene, "Fist_" + std::to_string(row) + "_" + std::to_string(col));
+
+                if (auto *fbxRoot = scene->GetEntity(fbxInstance.__rootEntity__))
+                {
+                    const float x = (static_cast<float>(col) - half) * spacing;
+                    const float z = (static_cast<float>(row) - half) * spacing;
+                    fbxRoot->GetTransform().SetPosition(gridCenter + glm::vec3(x, 0.f, z));
+                    fbxRoot->GetTransform().SetScale(fistScale);
+                }
+            }
         }
     }
 
@@ -197,9 +221,6 @@ glm::vec3 boxScale{1.f, 1.f, 1.f};
 glm::vec3 objPos{-2.f, 0.f, 0.f};
 glm::vec3 objRot{0.f, 0.f, 0.f};
 glm::vec3 objScale{0.5f};
-glm::vec3 fbxPos{2.5f, 0.f, 0.f};
-glm::vec3 fbxRot{0.f, 0.f, 0.f};
-glm::vec3 fbxScale{0.008f};
 
 void initIMGUI(GLFWwindow *window)
 {
@@ -258,11 +279,6 @@ int main()
         ImGui::SliderFloat3("Obj Scale", glm::value_ptr(objScale), 0.1f, 5.f);
 
         ImGui::Separator();
-        ImGui::SliderFloat3("Fbx Position", glm::value_ptr(fbxPos), -5.f, 5.f);
-        ImGui::SliderFloat3("Fbx Rotation", glm::value_ptr(fbxRot), -180.f, 180.f);
-        ImGui::SliderFloat3("Fbx Scale", glm::value_ptr(fbxScale), 0.1f, 5.f);
-
-        ImGui::Separator();
         ImGui::Text("Skybox");
         ImGui::Checkbox("Skybox Enabled", &skyboxEnabled);
         ImGui::SliderFloat("Skybox Intensity", &skyboxIntensity, 0.f, 4.f);
@@ -271,17 +287,19 @@ int main()
         ImGui::Combo("Skybox Source", &skyboxSource, skyboxItems, IM_ARRAYSIZE(skyboxItems));
         ImGui::End();
 
-        scene->GetEntity(boxID)->GetTransform().SetPosition(boxPos);
-        scene->GetEntity(boxID)->GetTransform().SetEulerXyzDeg(boxRot);
-        scene->GetEntity(boxID)->GetTransform().SetScale(boxScale);
+        if (auto *box = scene->GetEntity(boxID))
+        {
+            box->GetTransform().SetPosition(boxPos);
+            box->GetTransform().SetEulerXyzDeg(boxRot);
+            box->GetTransform().SetScale(boxScale);
+        }
 
-        objRoot->GetTransform().SetPosition(objPos);
-        objRoot->GetTransform().SetEulerXyzDeg(objRot);
-        objRoot->GetTransform().SetScale(objScale);
-
-        fbxRoot->GetTransform().SetPosition(fbxPos);
-        fbxRoot->GetTransform().SetEulerXyzDeg(fbxRot);
-        fbxRoot->GetTransform().SetScale(fbxScale);
+        if (auto *objRoot = scene->GetEntity(objRootID))
+        {
+            objRoot->GetTransform().SetPosition(objPos);
+            objRoot->GetTransform().SetEulerXyzDeg(objRot);
+            objRoot->GetTransform().SetScale(objScale);
+        }
 
         if (skyboxSource == 0)
         {
@@ -312,6 +330,9 @@ int main()
             break;
     }
 
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
     renderer->Shutdown();
     App.Destroy();
     /* ************************************************************************************************ */

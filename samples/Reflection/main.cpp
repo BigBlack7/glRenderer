@@ -74,18 +74,18 @@ void ScenePrepare()
     /* 材质处理阶段 */
     auto earthTex = std::make_shared<core::Texture>("planet/earth.jpg", 0);
     earthMaterial->SetTexture(core::TextureSlot::Albedo, earthTex);
-    earthMaterial->SetVec3("uDefaultColor", glm::vec3(1.f, 1.f, 1.f));
-    earthMaterial->SetFloat("uShininess", 64.f);
+    earthMaterial->SetBaseColor(glm::vec3(1.f, 1.f, 1.f));
+    earthMaterial->SetShininess(64.f);
 
     auto moonTex = std::make_shared<core::Texture>("planet/moon.jpg", 0);
     moonMaterial->SetTexture(core::TextureSlot::Albedo, moonTex);
-    moonMaterial->SetVec3("uDefaultColor", glm::vec3(0.23f, 0.43f, 0.82f));
-    moonMaterial->SetFloat("uShininess", 32.f);
+    moonMaterial->SetBaseColor(glm::vec3(0.23f, 0.43f, 0.82f));
+    moonMaterial->SetShininess(32.f);
 
     auto sunTex = std::make_shared<core::Texture>("planet/sun.jpg", 0);
     sunMaterial->SetTexture(core::TextureSlot::Albedo, sunTex);
-    sunMaterial->SetVec3("uDefaultColor", glm::vec3(0.67f, 0.21f, 0.45f));
-    sunMaterial->SetFloat("uShininess", 16.f);
+    sunMaterial->SetBaseColor(glm::vec3(0.67f, 0.21f, 0.45f));
+    sunMaterial->SetShininess(16.f);
 
     /* 实体构造阶段 */
     scene = std::make_unique<core::Scene>();

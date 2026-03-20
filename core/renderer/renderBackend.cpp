@@ -205,6 +205,7 @@ namespace core
         mCachedSpotCount = std::numeric_limits<uint32_t>::max();
         mCachedSpotVersions.fill(std::numeric_limits<uint64_t>::max());
         mProgramBlockBoundCache.clear();
+        mMaterialBindingCache.clear();
 
         mInstancedLayoutCache.clear();
         mInstanceModelScratch.clear();
@@ -229,6 +230,7 @@ namespace core
         mInstanceNormalBuffer = InstanceBuffer{};
         mStateCache.Reset();
         mProgramBlockBoundCache.clear();
+        mMaterialBindingCache.clear();
         mInstancedLayoutCache.clear();
         mInstanceModelScratch.clear();
         mInstanceNormalScratch.clear();
@@ -298,8 +300,8 @@ namespace core
             return;
 
         // 绑定帧数据块到槽位0, 光照数据块到槽位1
-        shader.BindUniformBlock("FrameBlock", FrameBlockBindingPoint);
-        shader.BindUniformBlock("LightBlock", LightBlockBindingPoint);
+        shader.BindUniformBlock("FrameBlock", FrameBlockBindingPoint, true);
+        shader.BindUniformBlock("LightBlock", LightBlockBindingPoint, false);
         mProgramBlockBoundCache.insert(shader.GetID());
     }
 
@@ -399,43 +401,46 @@ namespace core
     void RenderBackend::ApplyMaterial(const Material &material, const Shader &shader, RenderProfiler &stats)
     {
         const auto &textures = material.GetTextures();
-        const auto &samplerNames = material.GetTextureUniformNames();
+        const auto &bindings = GetMaterialBindings(shader);
 
-        // 绑定所有纹理并设置采样器uniform
         for (size_t i = 0; i < textures.size(); ++i)
         {
             const auto &tex = textures[i];
-            if (!tex)
+            const GLint samplerLoc = bindings.mSampler[i];
+            if (!tex || samplerLoc < 0)
                 continue;
 
             const uint32_t unit = static_cast<uint32_t>(i);
-
-            // 使用状态缓存避免重复绑定
             if (mStateCache.BindTexture2D(unit, tex->GetID()))
                 ++stats.__textureBinds__;
 
-            const std::string &samplerName = samplerNames[i];
-            if (!samplerName.empty())
-                shader.SetInt(samplerName, static_cast<int>(unit));
+            shader.SetInt(samplerLoc, static_cast<int>(unit));
         }
 
-        // 设置材质特性标志
-        shader.SetUInt("uMaterialFlags", material.GetFeatureFlags());
+        if (bindings.mMaterialFlags >= 0)
+            shader.SetUInt(bindings.mMaterialFlags, material.GetFeatureFlags());
 
         const RenderStateDesc &state = material.GetRenderState();
-        shader.SetUInt("uAlphaMode", static_cast<uint32_t>(state.mDomain));
-        shader.SetFloat("uAlphaCutoff", state.mAlphaCutoff);
-        shader.SetFloat("uOpacity", state.mOpacity);
+        if (bindings.mAlphaMode >= 0)
+            shader.SetUInt(bindings.mAlphaMode, static_cast<uint32_t>(state.mDomain));
+        if (bindings.mAlphaCutoff >= 0)
+            shader.SetFloat(bindings.mAlphaCutoff, state.mAlphaCutoff);
+        if (bindings.mOpacity >= 0)
+            shader.SetFloat(bindings.mOpacity, state.mOpacity);
 
-        // 应用各种材质参数
+        if (bindings.mBaseColor >= 0)
+            shader.SetVec3(bindings.mBaseColor, material.GetBaseColor());
+        if (bindings.mShininess >= 0)
+            shader.SetFloat(bindings.mShininess, material.GetShininess());
+
         for (const auto &[name, value] : material.GetFloatParams())
-            shader.SetFloat(name, value);
+            shader.SetFloatOptional(name, value);
         for (const auto &[name, value] : material.GetIntParams())
-            shader.SetInt(name, value);
+            shader.SetIntOptional(name, value);
         for (const auto &[name, value] : material.GetUIntParams())
-            shader.SetUInt(name, value);
+            shader.SetUIntOptional(name, value);
         for (const auto &[name, value] : material.GetVec3Params())
-            shader.SetVec3(name, value);
+            shader.SetVec3Optional(name, value);
     }
 
     void RenderBackend::DrawMesh(const Mesh &mesh, RenderProfiler &stats)
@@ -692,13 +697,13 @@ namespace core
             {
                 ApplyRenderState(material.GetRenderState());
                 ApplyMaterial(material, shader, stats);
-                shader.SetUInt("uUseInstancing", 0u);
+                shader.SetUIntOptional("uUseInstancing", 0u);
                 lastMaterial = &material;
                 lastMaterialVersion = material.GetVersion();
             }
 
-            shader.SetMat4("uM", item.__world__);
-            shader.SetMat3("uN", item.__normal__);
+            shader.SetMat4Optional("uM", item.__world__);
+            shader.SetMat3Optional("uN", item.__normal__);
             DrawMesh(*item.__mesh__, stats);
         }
     }
@@ -826,12 +831,12 @@ namespace core
         ApplyRenderState(material.GetRenderState());
         ApplyMaterial(material, shader, stats);
 
-        shader.SetUInt("uUseInstancing", 1u); // 通知着色器启用实例化渲染
+        shader.SetUIntOptional("uUseInstancing", 1u); // 通知着色器启用实例化渲染
 
         if (!UploadInstanceData(items)) // 上传实例化数据到GPU缓冲区
         {
             // 数据上传失败时, 退回到普通绘制模式
-            shader.SetUInt("uUseInstancing", 0u); // 关闭实例化标志
+            shader.SetUIntOptional("uUseInstancing", 0u); // 关闭实例化标志
             DrawItems(items, stats);
             return;
         }
@@ -839,7 +844,16 @@ namespace core
         EnsureInstancedLayout(*head.__mesh__);
         DrawMeshInstanced(*head.__mesh__, static_cast<uint32_t>(items.size()), stats);
 
-        shader.SetUInt("uUseInstancing", 0u); // 重置实例化标志避免影响后续绘制
+        shader.SetUIntOptional("uUseInstancing", 0u); // 重置实例化标志避免影响后续绘制
+    }
+
+    const MaterialShaderBindings &RenderBackend::GetMaterialBindings(const Shader &shader)
+    {
+        const GLuint program = shader.GetID();
+        if (const auto it = mMaterialBindingCache.find(program); it != mMaterialBindingCache.end())
+            return it->second;
+
+        return mMaterialBindingCache.emplace(program, BuildMaterialShaderBindings(shader)).first->second;
     }
 
     void RenderBackend::DrawOpaqueQueue(const RenderQueue &queue, RenderProfiler &stats)
@@ -863,7 +877,7 @@ namespace core
             if (batch.__count__ == 0u) // 跳过空批次
                 continue;
 
-            const DrawItem *begin = items.data() + batch.__start__; // 计算批次起始指针
+            const DrawItem *begin = items.data() + batch.__start__;       // 计算批次起始指针
             std::span<const DrawItem> batchItems(begin, batch.__count__); // 创建批次数据视图
 
             if (batch.__count__ >= MinInstanceCount)

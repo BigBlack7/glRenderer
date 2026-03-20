@@ -17,6 +17,7 @@ namespace core
         GLuint mProgram{0};
 
         mutable std::unordered_map<std::string, GLint> mUniformLocationCache{};
+        mutable std::unordered_map<std::string, GLuint> mUniformBlockIndexCache{};
         mutable std::unordered_set<std::string> mMissingUniformWarned{};
         mutable std::unordered_set<std::string> mMissingUniformBlockWarned{};
 
@@ -51,16 +52,22 @@ namespace core
 
         /// @brief  获取uniform变量的位置, 使用缓存优化性能
         /// @param name uniform变量名
+        /// @param warnIfMissing 是否在uniform变量不存在时警告
         /// @return uniform变量的位置, 如果不存在或被优化掉了则返回-1
-        GLint GetUniformLocation(std::string_view name) const;
+        GLint GetUniformLocation(std::string_view name, bool warnIfMissing) const;
+
+        /// @brief 获取uniform块的索引, 使用缓存优化性能
+        /// @param blockName uniform块名称
+        /// @param warnIfMissing 是否在uniform块不存在时警告
+        /// @return uniform块的索引, 如果不存在或被优化掉了则返回0
+        GLuint GetUniformBlockIndex(std::string_view blockName, bool warnIfMissing) const;
 
         /// @brief 释放着色器程序资源
         void Release() noexcept;
 
     public:
         Shader(std::string_view vertexPath, std::string_view fragmentPath);
-        Shader(const char *vertexPath, const char *fragmentPath)
-            : Shader(std::string_view(vertexPath), std::string_view(fragmentPath)) {}
+        Shader(const char *vertexPath, const char *fragmentPath) : Shader(std::string_view(vertexPath), std::string_view(fragmentPath)) {}
         ~Shader() noexcept;
 
         // 禁止拷贝避免同一个GL Program被多个对象析构
@@ -70,11 +77,26 @@ namespace core
         /* getter */
         GLuint GetID() const noexcept { return mProgram; }
 
+        /// @brief 查找uniform变量的位置, 如果不存在则返回-1
+        /// @param name uniform变量名
+        /// @return uniform变量的位置
+        GLint FindUniformLocation(std::string_view name) const;
+
+        /// @brief 检查着色器程序是否包含指定的uniform变量
+        /// @param name uniform变量名
+        /// @return 是否包含
+        bool HasUniform(std::string_view name) const;
+
+        /// @brief 检查着色器程序是否包含指定的uniform块
+        /// @param blockName uniform块名称
+        /// @return 是否包含
+        bool HasUniformBlock(std::string_view blockName) const;
+
         /// @brief 将着色器程序中的uniform块绑定到指定的绑定点上, 以便后续通过绑定点访问该uniform块的数据
         /// @param blockName uniform块名称
         /// @param bindingPoint 绑定点
         /// @return 是否绑定成功
-        bool BindUniformBlock(std::string_view blockName, uint32_t bindingPoint) const;
+        bool BindUniformBlock(std::string_view blockName, uint32_t bindingPoint, bool warnIfMissing = true) const;
 
         /* setter -> 通过着色器程序ID和uniform变量名获取uniform变量的位置, 然后设置uniform变量的值为value */
         void SetFloat(std::string_view name, float value) const;
@@ -85,5 +107,20 @@ namespace core
         void SetUInt(std::string_view name, uint32_t value) const;
         void SetMat4(std::string_view name, const glm::mat4 &value) const;
         void SetMat3(std::string_view name, const glm::mat3 &value) const;
+
+        void SetFloat(GLint location, float value) const;
+        void SetVec3(GLint location, float x, float y, float z) const;
+        void SetVec3(GLint location, const glm::vec3 &value) const;
+        void SetInt(GLint location, int value) const;
+        void SetUInt(GLint location, uint32_t value) const;
+        void SetMat4(GLint location, const glm::mat4 &value) const;
+        void SetMat3(GLint location, const glm::mat3 &value) const;
+
+        void SetFloatOptional(std::string_view name, float value) const;
+        void SetVec3Optional(std::string_view name, const glm::vec3 &value) const;
+        void SetIntOptional(std::string_view name, int value) const;
+        void SetUIntOptional(std::string_view name, uint32_t value) const;
+        void SetMat4Optional(std::string_view name, const glm::mat4 &value) const;
+        void SetMat3Optional(std::string_view name, const glm::mat3 &value) const;
     };
 }

@@ -15,7 +15,7 @@ uniform sampler2D uOpacitySampler;
 
 // uniform
 uniform uint uMaterialFlags;
-uniform vec3 uDefaultColor = vec3(1.0);
+uniform vec3 uBaseColor = vec3(1.0);
 uniform float uShininess = 64.0;
 uniform uint uAlphaMode = 0u; // 0 Opaque, 1 Cutout, 2 Transparent
 uniform float uAlphaCutoff = 0.5;
@@ -42,7 +42,7 @@ void main()
     vec3 V = normalize(uViewPosTime.xyz - oFragPos);
     
     // material features
-    vec3 object_color = ((uMaterialFlags & MAT_HAS_ALBEDO_TEX) != 0u) ? texture(uAlbedoSampler, oUV).rgb : uDefaultColor;
+    vec3 object_color = ((uMaterialFlags & MAT_HAS_ALBEDO_TEX) != 0u) ? texture(uAlbedoSampler, oUV).rgb : uBaseColor;
     
     float base_alpha = ((uMaterialFlags & MAT_HAS_ALBEDO_TEX) != 0u) ? texture(uAlbedoSampler, oUV).a : 1.0;
     float opacity_mask = ((uMaterialFlags & MAT_HAS_OPACITY_TEX) != 0u) ? texture(uOpacitySampler, oUV).r : 1.0;

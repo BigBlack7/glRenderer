@@ -7,12 +7,14 @@
 #include "renderOption.hpp"
 #include "buffer/instanceBuffer.hpp"
 #include "profiler.hpp"
+#include "material/materialBinding.hpp"
 #include <vector>
 #include <array>
 #include <cstdint>
 #include <limits>
 #include <span>
 #include <unordered_set>
+#include <unordered_map>
 
 namespace core
 {
@@ -40,19 +42,20 @@ namespace core
         std::vector<glm::mat4> mInstanceModelScratch{};     // 上传前临时缓存
         std::vector<glm::vec4> mInstanceNormalScratch{};    // 每实例3个vec4
 
-        uint32_t mCachedDirectionalCount{std::numeric_limits<uint32_t>::max()};  // 缓存的定向光数量
-        std::array<uint64_t, MaxDirectionalLights> mCachedDirectionalVersions{}; // 平行光源的版本号缓存
-        uint32_t mCachedPointCount{std::numeric_limits<uint32_t>::max()};        // 缓存的点光源数量
-        std::array<uint64_t, MaxPointLights> mCachedPointVersions{};             // 点光源的版本号缓存
-        uint32_t mCachedSpotCount{std::numeric_limits<uint32_t>::max()};         // 缓存的聚光灯数量
-        std::array<uint64_t, MaxSpotLights> mCachedSpotVersions{};               // 聚光灯的版本号缓存
-        std::unordered_set<GLuint> mProgramBlockBoundCache{};                    // 已绑定UBO的着色器程序缓存
+        uint32_t mCachedDirectionalCount{std::numeric_limits<uint32_t>::max()};     // 缓存的定向光数量
+        std::array<uint64_t, MaxDirectionalLights> mCachedDirectionalVersions{};    // 平行光源的版本号缓存
+        uint32_t mCachedPointCount{std::numeric_limits<uint32_t>::max()};           // 缓存的点光源数量
+        std::array<uint64_t, MaxPointLights> mCachedPointVersions{};                // 点光源的版本号缓存
+        uint32_t mCachedSpotCount{std::numeric_limits<uint32_t>::max()};            // 缓存的聚光灯数量
+        std::array<uint64_t, MaxSpotLights> mCachedSpotVersions{};                  // 聚光灯的版本号缓存
+        std::unordered_set<GLuint> mProgramBlockBoundCache{};                       // 已绑定UBO的着色器程序缓存
+        std::unordered_map<GLuint, MaterialShaderBindings> mMaterialBindingCache{}; // 材质绑定缓存
 
         bool mInitialized{false};
         glm::vec4 mClearColor{};
 
-        RenderStateDesc mAppliedState{};// 已应用的渲染状态描述
-        bool mHasAppliedState{false}; // 是否已应用渲染状态
+        RenderStateDesc mAppliedState{}; // 已应用的渲染状态描述
+        bool mHasAppliedState{false};    // 是否已应用渲染状态
 
         GLuint mFullscreenTriangleVAO{0}; // 全屏三角形VAO
 
@@ -95,11 +98,16 @@ namespace core
         /// @param instanceCount 实例数量
         /// @param stats 渲染性能统计
         void DrawMeshInstanced(const Mesh &mesh, uint32_t instanceCount, RenderProfiler &stats);
-        
+
         /// @brief 绘制实例化物体列表, 适用于大量实例共享同一Mesh/Material的情况, 减少DrawCall数量
         /// @param items 绘制项数组
         /// @param stats 渲染性能统计
         void DrawInstancedItems(std::span<const DrawItem> items, RenderProfiler &stats);
+
+        /// @brief 获取材质绑定缓存
+        /// @param shader 着色器对象
+        /// @return 材质绑定缓存
+        const MaterialShaderBindings &GetMaterialBindings(const Shader &shader);
 
     public:
         /// @brief 初始化渲染后端, 创建UBO并设置基础OpenGL状态

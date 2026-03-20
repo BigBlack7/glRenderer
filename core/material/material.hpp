@@ -17,7 +17,7 @@ namespace core
     {
         Albedo = 0,
         Normal,
-        MetallicRoughness,
+        MetallicRoughness, // for Blinn-Phong -> SpecularMask
         AO,
         Emissive,
         OpacityMask,
@@ -32,14 +32,7 @@ namespace core
 
         std::shared_ptr<Shader> mShader{};
         std::array<std::shared_ptr<Texture>, TextureSlotCount> mTextures{};
-        std::array<std::string, TextureSlotCount> mTextureUniformNames{
-            "uAlbedoSampler",        // Albedo
-            "uNormalSampler",        // Normal
-            "uMetallicRoughSampler", // MetallicRoughness(for Blinn-Phong -> SpecularMask)
-            "uAOSampler",            // AO
-            "uEmissiveSampler",      // Emissive
-            "uOpacitySampler"       // OpacityMask
-        };
+        
 
         // 材质特性位掩码
         uint32_t mFeatureFlags{0};
@@ -48,14 +41,14 @@ namespace core
         // 渲染状态描述
         RenderStateDesc mRenderState{MakeOpaqueState()};
 
+        glm::vec3 mBaseColor{1.f, 1.f, 1.f};
+        float mShininess{64.f};
+
+        // 仅用于额外扩展参数, 核心参数改为强类型字段
         std::unordered_map<std::string, float> mFloatParams{};
         std::unordered_map<std::string, int> mIntParams{};
         std::unordered_map<std::string, uint32_t> mUIntParams{};
         std::unordered_map<std::string, glm::vec3> mVec3Params{};
-
-        // 运行期日志记录避免刷屏
-        mutable bool mWarnedNoShader{false};          // 记录是否已经警告过缺失着色器
-        mutable uint32_t mWarnedEmptySamplerMask{0u}; // 记录是否已经警告过缺失贴图槽位
 
     private:
         static constexpr size_t ToIndex(TextureSlot slot) { return static_cast<size_t>(slot); }
@@ -84,16 +77,15 @@ namespace core
         /// @return 对应槽位的纹理对象, 如果未设置则返回nullptr
         std::shared_ptr<Texture> GetTexture(TextureSlot slot) const;
 
-        /// @brief 支持与shader命名不一致时手动映射
-        /// @param slot 纹理槽位
-        /// @param uniformName 纹理采样器在shader中的uniform变量名
-        void SetTextureUniformName(TextureSlot slot, std::string uniformName);
-
-        /// @brief 
-        /// @param state 
+        /// @brief 设置渲染状态
+        /// @param state 渲染状态描述
         void SetRenderState(const RenderStateDesc &state);
 
-        /* setter */
+        void SetBaseColor(const glm::vec3 &value);
+
+        void SetShininess(float value);
+
+        /* setter 识别uBaseColor/uDefaultColor/uShininess, 其余参数进入自定义参数池 */
         void SetFloat(std::string_view name, float value);
         void SetInt(std::string_view name, int value);
         void SetUInt(std::string_view name, uint32_t value);
@@ -103,9 +95,11 @@ namespace core
         uint64_t GetVersion() const noexcept { return mVersion; }
         const RenderStateDesc &GetRenderState() const noexcept { return mRenderState; }
 
+        const glm::vec3 &GetBaseColor() const noexcept { return mBaseColor; }
+        float GetShininess() const noexcept { return mShininess; }
+
         /* getter */
         const std::array<std::shared_ptr<Texture>, TextureSlotCount> &GetTextures() const noexcept { return mTextures; }
-        const std::array<std::string, TextureSlotCount> &GetTextureUniformNames() const noexcept { return mTextureUniformNames; }
         const std::unordered_map<std::string, float> &GetFloatParams() const noexcept { return mFloatParams; }
         const std::unordered_map<std::string, int> &GetIntParams() const noexcept { return mIntParams; }
         const std::unordered_map<std::string, uint32_t> &GetUIntParams() const noexcept { return mUIntParams; }

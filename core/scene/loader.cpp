@@ -294,16 +294,16 @@ namespace core
             aiColor4D color{}; // 颜色
             // 尝试获取基础颜色或漫反射颜色
             if (AI_SUCCESS == aiGetMaterialColor(&aiMaterial, AI_MATKEY_BASE_COLOR, &color) || AI_SUCCESS == aiGetMaterialColor(&aiMaterial, AI_MATKEY_COLOR_DIFFUSE, &color))
-                material->SetVec3("uDefaultColor", glm::vec3(color.r, color.g, color.b)); // 设置材质颜色
+                material->SetBaseColor(glm::vec3(color.r, color.g, color.b)); // 设置材质颜色
             else
-                material->SetVec3("uDefaultColor", glm::vec3(1.f, 1.f, 1.f)); // 默认白模
+                material->SetBaseColor(glm::vec3(1.f, 1.f, 1.f)); // 默认白模
 
             ai_real shininess = 64.f; // 光泽度
             // 尝试获取光泽度
             if (AI_SUCCESS == aiGetMaterialFloat(&aiMaterial, AI_MATKEY_SHININESS, &shininess))
-                material->SetFloat("uShininess", std::max(1.f, static_cast<float>(shininess))); // 设置光泽度最小为1
+                material->SetShininess(std::max(1.f, static_cast<float>(shininess))); // 设置光泽度最小为1
             else
-                material->SetFloat("uShininess", 64.f); // 默认光泽度64
+                material->SetShininess(64.f); // 默认光泽度64
 
             // 尝试获取透明度
             ai_real opacityRaw = 1.f; // 原始透明度
@@ -522,8 +522,8 @@ namespace core
 
         // 创建默认材质
         auto fallbackMaterial = std::make_shared<Material>(options.__shader__);
-        fallbackMaterial->SetVec3("uDefaultColor", glm::vec3(1.f, 1.f, 1.f));
-        fallbackMaterial->SetFloat("uShininess", 64.f);
+        fallbackMaterial->SetBaseColor(glm::vec3(1.f, 1.f, 1.f));
+        fallbackMaterial->SetShininess(64.f);
 
         detail::BuildNodeRecursive(*aiSceneRef->mRootNode, *model, InvalidModelNodeID, *aiSceneRef, meshes, materials, fallbackMaterial);
 

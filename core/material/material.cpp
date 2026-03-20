@@ -9,6 +9,9 @@ namespace core
     namespace detail
     {
         constexpr float Epsilon = 1e-6f;
+        constexpr std::string_view ShininessName = "uShininess";
+        constexpr std::string_view BaseColorName = "uBaseColor";
+        constexpr std::string_view LegacyBaseColorName = "uDefaultColor";
     }
 
     Material::Material(std::shared_ptr<Shader> shader) : mShader(std::move(shader))
@@ -33,31 +36,17 @@ namespace core
         if (mShader == shader)
             return;
 
-        // flags与纹理存在性相关, 不依赖shader, 不需要重建FeatureFlags
         mShader = std::move(shader);
-        if (mShader)
-        {
-            mWarnedNoShader = false; // shader状态变化后重置一次性告警
-        }
-
         BumpVersion();
     }
 
     void Material::SetTexture(TextureSlot slot, std::shared_ptr<Texture> texture)
     {
         const size_t index = ToIndex(slot);
-
         if (mTextures[index] == texture)
             return;
 
         mTextures[index] = std::move(texture);
-
-        // 纹理移除后, 清理该槽位告警位, 避免后续无法再次提示
-        if (!mTextures[index])
-        {
-            const uint32_t bit = (1u << static_cast<uint32_t>(index));
-            mWarnedEmptySamplerMask &= ~bit;
-        }
         RebuildFeatureFlags();
         BumpVersion();
     }
@@ -67,33 +56,42 @@ namespace core
         return mTextures[ToIndex(slot)];
     }
 
-    void Material::SetTextureUniformName(TextureSlot slot, std::string uniformName)
+    void Material::SetRenderState(const RenderStateDesc &state)
     {
-        // 保存槽位对应sampler名
-        const size_t index = ToIndex(slot);
-
-        if (mTextureUniformNames[index] == uniformName)
+        if (mRenderState == state)
             return;
 
-        mTextureUniformNames[index] = std::move(uniformName);
-
-        // uniformName修复后清理告警位
-        if (!mTextureUniformNames[index].empty())
-        {
-            const uint32_t bit = (1u << static_cast<uint32_t>(index));
-            mWarnedEmptySamplerMask &= ~bit;
-        }
+        mRenderState = state;
         BumpVersion();
     }
 
-    void Material::SetRenderState(const RenderStateDesc &state)
+    void Material::SetBaseColor(const glm::vec3 &value)
     {
-        mRenderState = state;
+        if (glm::length(mBaseColor - value) <= detail::Epsilon)
+            return;
+
+        mBaseColor = value;
+        BumpVersion();
+    }
+
+    void Material::SetShininess(float value)
+    {
+        value = std::max(1.f, value);
+        if (glm::abs(mShininess - value) <= detail::Epsilon)
+            return;
+
+        mShininess = value;
         BumpVersion();
     }
 
     void Material::SetFloat(std::string_view name, float value)
     {
+        if (name == detail::ShininessName)
+        {
+            SetShininess(value);
+            return;
+        }
+
         const std::string key(name);
         const auto it = mFloatParams.find(key);
         if (it != mFloatParams.end() && glm::abs(it->second - value) <= detail::Epsilon)
@@ -127,6 +125,12 @@ namespace core
 
     void Material::SetVec3(std::string_view name, const glm::vec3 &value)
     {
+        if (name == detail::BaseColorName || name == detail::LegacyBaseColorName)
+        {
+            SetBaseColor(value);
+            return;
+        }
+
         const std::string key(name);
         const auto it = mVec3Params.find(key);
         if (it != mVec3Params.end() && glm::length(it->second - value) <= detail::Epsilon)

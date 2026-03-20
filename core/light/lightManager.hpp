@@ -1,6 +1,5 @@
 ﻿#pragma once
 #include "light.hpp"
-#include <glm/glm.hpp>
 #include <optional>
 #include <span>
 #include <vector>
@@ -21,6 +20,7 @@ namespace core
             std::vector<std::optional<T>> __lights__;
             std::vector<LightID> __freeIDs__;
             mutable std::vector<T> __uploadCache__;
+            mutable bool __cacheDirty__{true};
         };
 
         std::unordered_map<std::type_index, void *> __lightPools__;
@@ -69,6 +69,7 @@ namespace core
                     pool.__uploadCache__.push_back(*light);
                 }
             }
+            pool.__cacheDirty__ = false;
         }
 
     public:
@@ -98,11 +99,13 @@ namespace core
                 const LightID id = pool.__freeIDs__.back();
                 pool.__freeIDs__.pop_back();
                 pool.__lights__[id] = light;
+                pool.__cacheDirty__ = true;
                 return id;
             }
 
             const LightID id = static_cast<LightID>(pool.__lights__.size());
             pool.__lights__.emplace_back(light);
+            pool.__cacheDirty__ = true;
             return id;
         }
 
@@ -115,6 +118,7 @@ namespace core
             auto &pool = GetPool<T>();
             pool.__lights__[id].reset();
             pool.__freeIDs__.push_back(id);
+            pool.__cacheDirty__ = true;
             return true;
         }
 
@@ -123,7 +127,10 @@ namespace core
         {
             if (!IsValidLightID<T>(id))
                 return nullptr;
-            return &GetPool<T>().__lights__[id].value();
+
+            auto &pool = GetPool<T>();
+            pool.__cacheDirty__ = true; // 返回可写指针，调用方可能修改灯光
+            return &pool.__lights__[id].value();
         }
 
         template <typename T>
@@ -138,7 +145,7 @@ namespace core
         [[nodiscard]] std::span<const T> GetLights() const noexcept
         {
             const auto &pool = GetPool<T>();
-            if (pool.__uploadCache__.empty() && !pool.__lights__.empty())
+            if (pool.__cacheDirty__)
             {
                 RebuildUploadCache<T>();
             }
@@ -152,6 +159,7 @@ namespace core
             pool.__lights__.clear();
             pool.__freeIDs__.clear();
             pool.__uploadCache__.clear();
+            pool.__cacheDirty__ = true;
         }
 
         void ClearAllLights()
