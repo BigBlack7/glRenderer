@@ -76,7 +76,9 @@ void ScenePrepare()
     auto cube = core::Mesh::CreateCube(1.f);
 
     /* 材质处理阶段 */
-    auto boxTex = std::make_shared<core::Texture>("box/box.png", 0);
+    auto albedoInfo = core::Texture::CreateInfo{.__sRGB__ = true};
+    
+    auto boxTex = std::make_shared<core::Texture>("box/box.png", 0, albedoInfo);
     auto boxSMTex = std::make_shared<core::Texture>("box/sp_mask.png", 1);
     boxMaterial->SetTexture(core::TextureSlot::Albedo, boxTex);
     boxMaterial->SetTexture(core::TextureSlot::MetallicRoughness, boxSMTex);
@@ -84,7 +86,7 @@ void ScenePrepare()
     boxState.mStencil.mStencilTest = true;
     boxMaterial->SetRenderState(boxState);
 
-    auto windowTex = std::make_shared<core::Texture>("window.png", 0);
+    auto windowTex = std::make_shared<core::Texture>("window.png", 0, albedoInfo);
     windowMaterial->SetTexture(core::TextureSlot::Albedo, windowTex);
     windowMaterial->SetRenderState(core::MakeTransparentState());
 

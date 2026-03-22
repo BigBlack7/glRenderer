@@ -23,6 +23,7 @@ namespace core
         struct CreateInfo final
         {
             bool __flipY__{true};
+            bool __sRGB__{false}; // 是否使用sRGB空间(gamma矫正)
             GLint __wrapS__{GL_REPEAT};
             GLint __wrapT__{GL_REPEAT};
             GLint __magFilter__{GL_LINEAR};
@@ -62,7 +63,8 @@ namespace core
         static std::filesystem::path ResolveTexturePath(const std::filesystem::path &path, const std::filesystem::path &baseDir);
 
     public:
-        Texture(const std::string &path, uint32_t unit); // 兼容层
+        Texture(const std::string &path, uint32_t unit);                         // 兼容层
+        Texture(const std::string &path, uint32_t unit, const CreateInfo &info); // 兼容层(可指定sRGB等参数)
 
         /// @brief 支持"模型目录 + 相对路径"的文件纹理加载(从文件加载纹理)
         /// @param path 纹理文件路径

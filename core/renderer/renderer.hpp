@@ -3,7 +3,7 @@
 #include "renderBackend.hpp"
 #include "rendergraph.hpp"
 #include "buffer/frameBuffer.hpp"
-#include "profiler.hpp"
+#include "utils/profiler.hpp"
 #include "scene/scene.hpp"
 #include <glm/glm.hpp>
 #include <cstdint>
@@ -54,7 +54,7 @@ namespace core
         const RenderProfiler &GetStats() const noexcept { return mInfos; }
 
         /// @brief 执行渲染流程
-        /// @param scene 要渲染的场景  
+        /// @param scene 要渲染的场景
         /// @param camera 要渲染的相机
         /// @param timeSec 渲染时间, 单位秒
         void Render(Scene &scene, const Camera &camera, float timeSec = 0.f);

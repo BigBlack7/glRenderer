@@ -215,9 +215,6 @@ namespace core
         mHasAppliedState = false;
         ApplyRenderState(MakeOpaqueState());
 
-        // 启用立方体贴图无缝采样
-        glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-
         mInitialized = true;
         return true;
     }

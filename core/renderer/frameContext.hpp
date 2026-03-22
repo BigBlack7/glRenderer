@@ -1,7 +1,7 @@
 ﻿#pragma once
 #include "camera/camera.hpp"
 #include "renderQueue.hpp"
-#include "profiler.hpp"
+#include "utils/profiler.hpp"
 #include "scene/scene.hpp"
 #include <glm/glm.hpp>
 #include <cstdint>

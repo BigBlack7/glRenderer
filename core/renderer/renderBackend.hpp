@@ -6,7 +6,7 @@
 #include "renderStateCache.hpp"
 #include "renderOption.hpp"
 #include "buffer/instanceBuffer.hpp"
-#include "profiler.hpp"
+#include "utils/profiler.hpp"
 #include "material/materialBinding.hpp"
 #include <vector>
 #include <array>

@@ -158,10 +158,11 @@ namespace core
         }
 
         // 加载嵌入式纹理
-        std::shared_ptr<Texture> LoadEmbeddedTexture(const aiTexture &embedded, std::string_view debugName, bool flipY)
+        std::shared_ptr<Texture> LoadEmbeddedTexture(const aiTexture &embedded, std::string_view debugName, bool flipY, bool useSRGB)
         {
             Texture::CreateInfo info{};
             info.__flipY__ = flipY;
+            info.__sRGB__ = useSRGB;
 
             if (embedded.mHeight == 0) // 如果是压缩的纹理数据(例如png, jpg高度为0)
             {
@@ -192,6 +193,7 @@ namespace core
                                                       const std::filesystem::path &modelDir,
                                                       std::initializer_list<aiTextureType> candidates,
                                                       bool flipY,
+                                                      bool useSRGB,
                                                       std::unordered_map<std::string, std::shared_ptr<Texture>> &textureCache)
         {
             for (const aiTextureType type : candidates) // 遍历候选纹理类型
@@ -210,11 +212,11 @@ namespace core
                 // 1) 检查是否是嵌入式纹理
                 if (const aiTexture *embedded = aiSceneRef.GetEmbeddedTexture(rawPath.c_str()))
                 {
-                    const std::string cacheKey = "embedded:" + rawPath;
+                    const std::string cacheKey = "embedded:" + rawPath + "|srgb=" + (useSRGB ? "1" : "0");
                     if (const auto it = textureCache.find(cacheKey); it != textureCache.end()) // 如果缓存中存在则直接返回该纹理
                         return it->second;
 
-                    auto tex = LoadEmbeddedTexture(*embedded, rawPath, flipY); // 加载嵌入式纹理
+                    auto tex = LoadEmbeddedTexture(*embedded, rawPath, flipY, useSRGB); // 加载嵌入式纹理
                     // 如果加载成功且有效
                     if (tex && tex->IsValid())
                     {
@@ -227,15 +229,16 @@ namespace core
                 }
 
                 // 2) 处理外部纹理文件
-                const std::filesystem::path texturePath(rawPath);                                                           // 纹理路径
-                const std::filesystem::path cachePath = texturePath.is_absolute() ? texturePath : (modelDir / texturePath); // 缓存路径
-                const std::string cacheKey = cachePath.lexically_normal().generic_string();                                 // 标准化缓存键
+                const std::filesystem::path texturePath(rawPath);                                                              // 纹理路径
+                const std::filesystem::path cachePath = texturePath.is_absolute() ? texturePath : (modelDir / texturePath);    // 缓存路径
+                const std::string cacheKey = cachePath.lexically_normal().generic_string() + "|srgb=" + (useSRGB ? "1" : "0"); // 标准化缓存键
 
                 if (const auto it = textureCache.find(cacheKey); it != textureCache.end()) // 如果缓存中存在则直接返回该纹理
                     return it->second;
 
                 Texture::CreateInfo info{};                                            // 纹理创建信息
                 info.__flipY__ = flipY;                                                // 是否翻转Y轴
+                info.__sRGB__ = useSRGB;                                               // 是否按sRGB采样上传
                 auto tex = std::make_shared<Texture>(texturePath, 0u, modelDir, info); // 加载纹理
                 // 如果加载成功且有效
                 if (tex && tex->IsValid())
@@ -252,19 +255,21 @@ namespace core
         std::shared_ptr<Texture> LoadTexturePathWithCache(const std::filesystem::path &texturePath,
                                                           const std::filesystem::path &modelDir,
                                                           bool flipY,
+                                                          bool useSRGB,
                                                           std::unordered_map<std::string, std::shared_ptr<Texture>> &textureCache)
         {
             if (texturePath.empty())
                 return nullptr;
 
             const std::filesystem::path cachePath = texturePath.is_absolute() ? texturePath : (modelDir / texturePath);
-            const std::string cacheKey = cachePath.lexically_normal().generic_string();
+            const std::string cacheKey = cachePath.lexically_normal().generic_string() + "|srgb=" + (useSRGB ? "1" : "0");
 
             if (const auto it = textureCache.find(cacheKey); it != textureCache.end())
                 return it->second;
 
             Texture::CreateInfo info{};
             info.__flipY__ = flipY;
+            info.__sRGB__ = useSRGB;
             auto tex = std::make_shared<Texture>(texturePath, 0u, modelDir, info);
             if (tex && tex->IsValid())
             {
@@ -318,6 +323,7 @@ namespace core
                     modelDir,
                     {aiTextureType_BASE_COLOR, aiTextureType_DIFFUSE},
                     options.__flipTextureY__,
+                    true,
                     textureCache))
             {
                 GL_INFO("[ModelLoader] '{}' - Albedo Texture Loaded Successfully", modelName);
@@ -331,6 +337,7 @@ namespace core
                     modelDir,
                     {aiTextureType_METALNESS, aiTextureType_DIFFUSE_ROUGHNESS, aiTextureType_SPECULAR, aiTextureType_SHININESS},
                     options.__flipTextureY__,
+                    false,
                     textureCache))
             {
                 GL_INFO("[ModelLoader] '{}' - MetallicRoughness Texture Loaded Successfully", modelName);
@@ -355,6 +362,7 @@ namespace core
                     modelDir,
                     {aiTextureType_OPACITY},
                     options.__flipTextureY__,
+                    false,
                     textureCache))
             {
                 GL_INFO("[ModelLoader] '{}' - Opacity Mask Texture Loaded Successfully", modelName);
@@ -370,7 +378,8 @@ namespace core
                     continue;
                 }
 
-                if (auto manualTexture = LoadTexturePathWithCache(texturePath, modelDir, options.__flipTextureY__, textureCache))
+                const bool useSRGB = (slot == TextureSlot::Albedo);
+                if (auto manualTexture = LoadTexturePathWithCache(texturePath, modelDir, options.__flipTextureY__, useSRGB, textureCache))
                 {
                     if (existingTexture && options.__allowOverrideLoadedTextures__)
                     {

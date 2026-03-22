@@ -36,11 +36,13 @@ namespace core
         if (mTextureID == 0)
             glGenTextures(1, &mTextureID);
 
-        glBindTexture(GL_TEXTURE_2D, mTextureID);  // 绑定纹理对象
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);     // 设置像素对齐方式为1字节
+        glBindTexture(GL_TEXTURE_2D, mTextureID); // 绑定纹理对象
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);    // 设置像素对齐方式为1字节
+
+        const GLint internalFormat = info.__sRGB__ ? GL_SRGB8_ALPHA8 : GL_RGBA8;
         glTexImage2D(GL_TEXTURE_2D,                // 上传纹理数据
                      0,                            // mipmap级别0
-                     GL_RGBA8,                     // 内部格式: RGBA8
+                     internalFormat,               // 内部格式: sRGB或线性RGBA8
                      static_cast<GLsizei>(width),  // 纹理宽度
                      static_cast<GLsizei>(height), // 纹理高度
                      0,                            // 边框宽度, 必须为0
@@ -54,7 +56,7 @@ namespace core
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, info.__wrapS__);         // S方向环绕模式
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, info.__wrapT__);         // T方向环绕模式
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, info.__magFilter__); // 放大过滤
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, info.__magFilter__); // 放大
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, info.__minFilter__); // 缩小过滤
         glBindTexture(GL_TEXTURE_2D, 0);                                           // 解绑纹理
 
@@ -153,6 +155,8 @@ namespace core
     }
 
     Texture::Texture(const std::string &path, uint32_t unit) : Texture(std::filesystem::path(path), unit, {}) {}
+
+    Texture::Texture(const std::string &path, uint32_t unit, const CreateInfo &info) : Texture(std::filesystem::path(path), unit, {}, info) {}
 
     Texture::Texture(const std::filesystem::path &path,
                      uint32_t unit,
