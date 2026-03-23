@@ -13,6 +13,7 @@ namespace core
         glm::vec3 __position__{0.f, 0.f, 0.f};
         glm::vec2 __uv__{0.f, 0.f}; // uv坐标
         glm::vec3 __normal__{0.f, 1.f, 0.f};
+        glm::vec3 __tangent__{0.f, 0.f, 0.f};
     };
 
     class Mesh final

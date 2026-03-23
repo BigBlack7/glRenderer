@@ -114,6 +114,11 @@ namespace core
                     v.__uv__ = glm::vec2(sourceMesh.mTextureCoords[0][i].x, sourceMesh.mTextureCoords[0][i].y);
                 }
 
+                if (sourceMesh.HasTangentsAndBitangents()) // 设置切线和副切线
+                {
+                    v.__tangent__ = glm::vec3(sourceMesh.mTangents[i].x, sourceMesh.mTangents[i].y, sourceMesh.mTangents[i].z);
+                }
+
                 vertices[i] = v;
             }
 
@@ -344,9 +349,19 @@ namespace core
                 material->SetTexture(TextureSlot::MetallicRoughness, std::move(metallicRough));
             }
 
-            // TODO: Normal map通道接入TBN后开启
-            if (HasAnyTexture(aiMaterial, {aiTextureType_NORMALS, aiTextureType_NORMAL_CAMERA, aiTextureType_HEIGHT}))
-                GL_DEBUG("[ModelLoader] TODO: '{}' - Normal Map Detected But Not Consumed Yet", modelName);
+            // 加载法线贴图
+            if (auto normalMap = LoadTextureWithCache(
+                    aiMaterial,
+                    aiSceneRef,
+                    modelDir,
+                    {aiTextureType_NORMALS, aiTextureType_NORMAL_CAMERA, aiTextureType_HEIGHT},
+                    options.__flipTextureY__,
+                    false,
+                    textureCache))
+            {
+                GL_INFO("[ModelLoader] '{}' - Normal Map Texture Loaded Successfully", modelName);
+                material->SetTexture(TextureSlot::Normal, std::move(normalMap));
+            }
 
             // TODO: AO通道接入后开启
             if (HasAnyTexture(aiMaterial, {aiTextureType_AMBIENT_OCCLUSION, aiTextureType_LIGHTMAP}))
@@ -489,7 +504,7 @@ namespace core
 
         Assimp::Importer importer{};
         // 合并相同顶点 | 改进缓存局部性 | 按图元类型排序
-        uint32_t flags = aiProcess_JoinIdenticalVertices | aiProcess_ImproveCacheLocality | aiProcess_SortByPType;
+        uint32_t flags = aiProcess_JoinIdenticalVertices | aiProcess_ImproveCacheLocality | aiProcess_SortByPType | aiProcess_CalcTangentSpace;
         if (options.__triangulate__) // 如果需要三角化, 则添加三角化标志
             flags |= aiProcess_Triangulate;
         if (options.__genSmoothNormals__) // 如果需要生成平滑法线, 则添加平滑法线标志

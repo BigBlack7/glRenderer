@@ -11,7 +11,7 @@
 #endif
 
 const float EPS = 0.000001;
-const float specularIntensity = 0.1;
+const float specularIntensity = 0.3;
 
 struct DirectionalLightGPU
 {

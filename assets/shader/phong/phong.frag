@@ -6,9 +6,11 @@ out vec4 oPixelColor;
 in vec2 oUV;
 in vec3 oNormal;
 in vec3 oFragPos;
+in mat3 oTBN;
 
 // sampler
 uniform sampler2D uAlbedoSampler;
+uniform sampler2D uNormalSampler;
 uniform sampler2D uMetallicRoughSampler;
 uniform sampler2D uAOSampler;
 uniform sampler2D uOpacitySampler;
@@ -22,6 +24,7 @@ uniform float uAlphaCutoff = 0.5;
 uniform float uOpacity = 1.0;
 
 const uint MAT_HAS_ALBEDO_TEX = (1u << 0u); // 漫反射贴图
+const uint MAT_HAS_NORMAL_TEX = (1u << 1u); // 法线向量贴图
 const uint MAT_HAS_METALLIC_ROUGHNESS_TEX = (1u << 2u); // 金属粗糙度贴图
 const uint MAT_HAS_AO_TEX = (1u << 3u); // 环境光遮蔽贴图
 const uint MAT_HAS_OPACITY_TEX = (1u << 5u); // 不透明度贴图
@@ -38,11 +41,11 @@ layout(std140, binding = 0)uniform FrameBlock
 void main()
 {
     // common
-    vec3 N = normalize(oNormal);
     vec3 V = normalize(uViewPosTime.xyz - oFragPos);
     
     // material features
     vec3 object_color = ((uMaterialFlags & MAT_HAS_ALBEDO_TEX) != 0u) ? texture(uAlbedoSampler, oUV).rgb : uBaseColor;
+    vec3 N = ((uMaterialFlags & MAT_HAS_NORMAL_TEX) != 0u) ? normalize(oTBN * ((texture(uNormalSampler, oUV).rgb) * 2.0 - vec3(1.0))) : normalize(oNormal);
     
     float base_alpha = ((uMaterialFlags & MAT_HAS_ALBEDO_TEX) != 0u) ? texture(uAlbedoSampler, oUV).a : 1.0;
     float opacity_mask = ((uMaterialFlags & MAT_HAS_OPACITY_TEX) != 0u) ? texture(uOpacitySampler, oUV).r : 1.0;

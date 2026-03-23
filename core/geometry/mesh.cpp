@@ -119,6 +119,10 @@ namespace core
         glEnableVertexAttribArray(2);
         glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), reinterpret_cast<void *>(offsetof(MeshVertex, __normal__)));
 
+        // location 3 -> tangent
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), reinterpret_cast<void *>(offsetof(MeshVertex, __tangent__)));
+
         glBindVertexArray(0);
     }
 
@@ -127,10 +131,10 @@ namespace core
         const float h = size * 0.5f;
 
         std::vector<MeshVertex> vertices = {
-            {{-h, -h, 0.f}, {0.f, 0.f}, {0.f, 0.f, 1.f}},
-            {{h, -h, 0.f}, {1.f, 0.f}, {0.f, 0.f, 1.f}},
-            {{h, h, 0.f}, {1.f, 1.f}, {0.f, 0.f, 1.f}},
-            {{-h, h, 0.f}, {0.f, 1.f}, {0.f, 0.f, 1.f}},
+            {{-h, -h, 0.f}, {0.f, 0.f}, {0.f, 0.f, 1.f}, {1.f, 0.f, 0.f}},
+            {{h, -h, 0.f}, {1.f, 0.f}, {0.f, 0.f, 1.f}, {1.f, 0.f, 0.f}},
+            {{h, h, 0.f}, {1.f, 1.f}, {0.f, 0.f, 1.f}, {1.f, 0.f, 0.f}},
+            {{-h, h, 0.f}, {0.f, 1.f}, {0.f, 0.f, 1.f}, {1.f, 0.f, 0.f}},
         };
 
         std::vector<uint32_t> indices = {
@@ -148,40 +152,39 @@ namespace core
 
         std::vector<MeshVertex> vertices = {
             // +Z
-            {{-h, -h, h}, {0.f, 0.f}, {0.f, 0.f, 1.f}},
-            {{h, -h, h}, {1.f, 0.f}, {0.f, 0.f, 1.f}},
-            {{h, h, h}, {1.f, 1.f}, {0.f, 0.f, 1.f}},
-            {{-h, h, h}, {0.f, 1.f}, {0.f, 0.f, 1.f}},
+            {{-h, -h, h}, {0.f, 0.f}, {0.f, 0.f, 1.f}, {1.f, 0.f, 0.f}},
+            {{h, -h, h}, {1.f, 0.f}, {0.f, 0.f, 1.f}, {1.f, 0.f, 0.f}},
+            {{h, h, h}, {1.f, 1.f}, {0.f, 0.f, 1.f}, {1.f, 0.f, 0.f}},
+            {{-h, h, h}, {0.f, 1.f}, {0.f, 0.f, 1.f}, {1.f, 0.f, 0.f}},
 
             // -Z
-            {{h, -h, -h}, {0.f, 0.f}, {0.f, 0.f, -1.f}},
-            {{-h, -h, -h}, {1.f, 0.f}, {0.f, 0.f, -1.f}},
-            {{-h, h, -h}, {1.f, 1.f}, {0.f, 0.f, -1.f}},
-            {{h, h, -h}, {0.f, 1.f}, {0.f, 0.f, -1.f}},
+            {{h, -h, -h}, {0.f, 0.f}, {0.f, 0.f, -1.f}, {-1.f, 0.f, 0.f}},
+            {{-h, -h, -h}, {1.f, 0.f}, {0.f, 0.f, -1.f}, {-1.f, 0.f, 0.f}},
+            {{-h, h, -h}, {1.f, 1.f}, {0.f, 0.f, -1.f}, {-1.f, 0.f, 0.f}},
+            {{h, h, -h}, {0.f, 1.f}, {0.f, 0.f, -1.f}, {-1.f, 0.f, 0.f}},
 
             // +Y
-            {{-h, h, h}, {0.f, 0.f}, {0.f, 1.f, 0.f}},
-            {{h, h, h}, {1.f, 0.f}, {0.f, 1.f, 0.f}},
-            {{h, h, -h}, {1.f, 1.f}, {0.f, 1.f, 0.f}},
-            {{-h, h, -h}, {0.f, 1.f}, {0.f, 1.f, 0.f}},
+            {{-h, h, h}, {0.f, 0.f}, {0.f, 1.f, 0.f}, {1.f, 0.f, 0.f}},
+            {{h, h, h}, {1.f, 0.f}, {0.f, 1.f, 0.f}, {1.f, 0.f, 0.f}},
+            {{h, h, -h}, {1.f, 1.f}, {0.f, 1.f, 0.f}, {1.f, 0.f, 0.f}},
+            {{-h, h, -h}, {0.f, 1.f}, {0.f, 1.f, 0.f}, {1.f, 0.f, 0.f}},
 
             // -Y
-            {{-h, -h, -h}, {0.f, 0.f}, {0.f, -1.f, 0.f}},
-            {{h, -h, -h}, {1.f, 0.f}, {0.f, -1.f, 0.f}},
-            {{h, -h, h}, {1.f, 1.f}, {0.f, -1.f, 0.f}},
-            {{-h, -h, h}, {0.f, 1.f}, {0.f, -1.f, 0.f}},
+            {{-h, -h, -h}, {0.f, 0.f}, {0.f, -1.f, 0.f}, {1.f, 0.f, 0.f}},
+            {{h, -h, -h}, {1.f, 0.f}, {0.f, -1.f, 0.f}, {1.f, 0.f, 0.f}},
+            {{h, -h, h}, {1.f, 1.f}, {0.f, -1.f, 0.f}, {1.f, 0.f, 0.f}},
+            {{-h, -h, h}, {0.f, 1.f}, {0.f, -1.f, 0.f}, {1.f, 0.f, 0.f}},
 
             // +X
-            {{h, -h, h}, {0.f, 0.f}, {1.f, 0.f, 0.f}},
-            {{h, -h, -h}, {1.f, 0.f}, {1.f, 0.f, 0.f}},
-            {{h, h, -h}, {1.f, 1.f}, {1.f, 0.f, 0.f}},
-            {{h, h, h}, {0.f, 1.f}, {1.f, 0.f, 0.f}},
-
+            {{h, -h, h}, {0.f, 0.f}, {1.f, 0.f, 0.f}, {0.f, 0.f, -1.f}},
+            {{h, -h, -h}, {1.f, 0.f}, {1.f, 0.f, 0.f}, {0.f, 0.f, -1.f}},
+            {{h, h, -h}, {1.f, 1.f}, {1.f, 0.f, 0.f}, {0.f, 0.f, -1.f}},
+            {{h, h, h}, {0.f, 1.f}, {1.f, 0.f, 0.f}, {0.f, 0.f, -1.f}},
             // -X
-            {{-h, -h, -h}, {0.f, 0.f}, {-1.f, 0.f, 0.f}},
-            {{-h, -h, h}, {1.f, 0.f}, {-1.f, 0.f, 0.f}},
-            {{-h, h, h}, {1.f, 1.f}, {-1.f, 0.f, 0.f}},
-            {{-h, h, -h}, {0.f, 1.f}, {-1.f, 0.f, 0.f}},
+            {{-h, -h, -h}, {0.f, 0.f}, {-1.f, 0.f, 0.f}, {0.f, 0.f, 1.f}},
+            {{-h, -h, h}, {1.f, 0.f}, {-1.f, 0.f, 0.f}, {0.f, 0.f, 1.f}},
+            {{-h, h, h}, {1.f, 1.f}, {-1.f, 0.f, 0.f}, {0.f, 0.f, 1.f}},
+            {{-h, h, -h}, {0.f, 1.f}, {-1.f, 0.f, 0.f}, {0.f, 0.f, 1.f}},
         };
 
         std::vector<uint32_t> indices = {
@@ -211,20 +214,34 @@ namespace core
         {
             const float v = static_cast<float>(i) / static_cast<float>(latitude);
             const float phi = glm::pi<float>() * v;
+            const float sin_phi = std::sinf(phi);
+            const float cos_phi = std::cosf(phi);
 
             for (uint32_t j = 0; j <= longitude; ++j)
             {
                 const float u = static_cast<float>(j) / static_cast<float>(longitude);
                 const float theta = glm::two_pi<float>() * u;
 
-                const float x = radius * sinf(phi) * cosf(theta);
-                const float y = radius * cosf(phi);
-                const float z = radius * sinf(phi) * sinf(theta);
+                const float x = radius * sin_phi * std::cosf(theta);
+                const float y = radius * cos_phi;
+                const float z = radius * sin_phi * std::sinf(theta);
 
                 glm::vec3 pos{x, y, z};
                 glm::vec3 n = glm::normalize(pos);
 
-                vertices.push_back({pos, {1.0f - u, 1.0f - v}, n});
+                // 切线沿经度方向(θ的偏导): (-sinθ, 0, cosθ) × 法线垂直分量
+                // 切线tangent = (-sinθ, 0, cosθ) 沿经度方向, 与法线垂直
+                glm::vec3 tangent;
+                tangent.x = -sinf(theta);
+                tangent.y = 0.0f;
+                tangent.z = cosf(theta);
+                tangent = glm::normalize(tangent);
+
+                // 处理极点特殊情况(phi=0 或 phi=π时, sin_phi=0, 切线可能失效)
+                if (sin_phi < 1e-6 || sin_phi > glm::pi<float>() - 1e-6)
+                    tangent = glm::vec3(1.f, 0.f, 0.f); // 极点处切线沿X轴, 副切线沿Z轴(避免零向量)
+
+                vertices.push_back({pos, {1.f - u, 1.f - v}, n, tangent});
             }
         }
 

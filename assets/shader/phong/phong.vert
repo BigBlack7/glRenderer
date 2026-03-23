@@ -2,21 +2,23 @@
 layout(location = 0)in vec3 lPosition;
 layout(location = 1)in vec2 lUV;
 layout(location = 2)in vec3 lNormal;
+layout(location = 3)in vec3 lTangent;
 
 // instancing attributes
-layout(location = 3)in vec4 iM0;
-layout(location = 4)in vec4 iM1;
-layout(location = 5)in vec4 iM2;
-layout(location = 6)in vec4 iM3;
+layout(location = 4)in vec4 iM0;
+layout(location = 5)in vec4 iM1;
+layout(location = 6)in vec4 iM2;
+layout(location = 7)in vec4 iM3;
 
-layout(location = 7)in vec4 iN0;
-layout(location = 8)in vec4 iN1;
-layout(location = 9)in vec4 iN2;
+layout(location = 8)in vec4 iN0;
+layout(location = 9)in vec4 iN1;
+layout(location = 10)in vec4 iN2;
 
 // out
 out vec2 oUV;
 out vec3 oNormal;
 out vec3 oFragPos;
+out mat3 oTBN;
 
 layout(std140, binding = 0)uniform FrameBlock
 {
@@ -47,4 +49,9 @@ void main()
     oUV = lUV;
     oNormal = normalize(normalMat * lNormal);
     oFragPos = worldPos.xyz;
+    
+    // TBN
+    vec3 T = normalize(mat3(model) * lTangent);
+    vec3 B = normalize(cross(oNormal, T));
+    oTBN = mat3(T, B, oNormal);
 }

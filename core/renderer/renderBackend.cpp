@@ -721,12 +721,12 @@ namespace core
         constexpr GLsizei modelStride = static_cast<GLsizei>(sizeof(glm::mat4)); // 单个模型矩阵的字节跨度(64字节)
         for (uint32_t col = 0u; col < 4u; ++col)                                 // 遍历矩阵的4个列向量
         {
-            const GLuint location = 3u + col;                                         // 属性位置从3开始(0-2是位置/法线/UV)
+            const GLuint location = 4u + col;                                         // 属性位置从4开始(0-2是位置/法线/UV)
             const uintptr_t offset = static_cast<uintptr_t>(sizeof(glm::vec4) * col); // 当前列的偏移量
 
             glEnableVertexAttribArray(location);
             glVertexAttribPointer(location, 4, GL_FLOAT, GL_FALSE, modelStride, reinterpret_cast<const void *>(offset));
-            glVertexAttribDivisor(location, 1u);
+            glVertexAttribDivisor(location, 1u); // 每个实例更新一次模型矩阵
         }
 
         // 设置法线矩阵属性
@@ -734,12 +734,12 @@ namespace core
         constexpr GLsizei normalStride = static_cast<GLsizei>(sizeof(glm::vec4) * 3u); // 法线矩阵的字节跨度(48字节, 实际是3x3矩阵)
         for (uint32_t col = 0u; col < 3u; ++col)                                       // 遍历法线矩阵的3个列向量
         {
-            const GLuint location = 7u + col; // 属性位置从7开始(接在模型矩阵之后)
+            const GLuint location = 8u + col; // 属性位置从8开始(接在模型矩阵之后)
             const uintptr_t offset = static_cast<uintptr_t>(sizeof(glm::vec4) * col);
 
             glEnableVertexAttribArray(location);
             glVertexAttribPointer(location, 4, GL_FLOAT, GL_FALSE, normalStride, reinterpret_cast<const void *>(offset));
-            glVertexAttribDivisor(location, 1u);
+            glVertexAttribDivisor(location, 1u); // 每个实例更新一次法线矩阵
         }
 
         InstanceBuffer::Unbind();
@@ -830,7 +830,7 @@ namespace core
 
         shader.SetUIntOptional("uUseInstancing", 1u); // 通知着色器启用实例化渲染
 
-        if (!UploadInstanceData(items)) // 上传实例化数据到GPU缓冲区
+        if (!UploadInstanceData(items)) // 上传实例化数据到GPU缓冲区(准备对应VBO)
         {
             // 数据上传失败时, 退回到普通绘制模式
             shader.SetUIntOptional("uUseInstancing", 0u); // 关闭实例化标志

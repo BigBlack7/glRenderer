@@ -70,14 +70,16 @@ void ScenePrepare()
     auto edgeShader = std::make_shared<core::Shader>("effect/edge.vert", "effect/edge.frag");
     auto boxMaterial = std::make_shared<core::Material>(phongShader);
     auto windowMaterial = std::make_shared<core::Material>(phongShader);
+    auto wallMaterial = std::make_shared<core::Material>(phongShader);
     auto edgeMaterial = std::make_shared<core::Material>(edgeShader);
 
     /* 几何生成阶段 */
     auto cube = core::Mesh::CreateCube(1.f);
+    auto plane = core::Mesh::CreatePlane(1.f);
 
     /* 材质处理阶段 */
     auto albedoInfo = core::Texture::CreateInfo{.__sRGB__ = true};
-    
+
     auto boxTex = std::make_shared<core::Texture>("box/box.png", 0, albedoInfo);
     auto boxSMTex = std::make_shared<core::Texture>("box/sp_mask.png", 1);
     boxMaterial->SetTexture(core::TextureSlot::Albedo, boxTex);
@@ -86,15 +88,21 @@ void ScenePrepare()
     boxState.mStencil.mStencilTest = true;
     boxMaterial->SetRenderState(boxState);
 
-    auto windowTex = std::make_shared<core::Texture>("window.png", 0, albedoInfo);
-    windowMaterial->SetTexture(core::TextureSlot::Albedo, windowTex);
-    windowMaterial->SetRenderState(core::MakeTransparentState());
-
     auto edgeState = core::MakeTransparentState();
     edgeState.mStencil.mStencilTest = true;
     edgeState.mStencil.mFront.mStencilMask = 0x00;
     edgeState.mStencil.mFront.mStencilFunc = core::CompareOp::NotEqual;
     edgeMaterial->SetRenderState(edgeState);
+
+    auto windowTex = std::make_shared<core::Texture>("window.png", 0, albedoInfo);
+    windowMaterial->SetTexture(core::TextureSlot::Albedo, windowTex);
+    windowMaterial->SetRenderState(core::MakeTransparentState());
+
+    auto wallTex = std::make_shared<core::Texture>("wall/wall_albedo.jpg", 0, albedoInfo);
+    auto wallNormalTex = std::make_shared<core::Texture>("wall/wall_normal.png", 1);
+    wallMaterial->SetTexture(core::TextureSlot::Albedo, wallTex);
+    wallMaterial->SetTexture(core::TextureSlot::Normal, wallNormalTex);
+    wallMaterial->SetRenderState(core::MakeOpaqueState());
 
     /* 实体&场景构造阶段 */
     scene = std::make_unique<core::Scene>();
@@ -104,14 +112,6 @@ void ScenePrepare()
     {
         box->SetMesh(cube);
         box->SetMaterial(boxMaterial);
-    }
-
-    auto windowID = scene->CreateEntity("Window");
-    if (auto *window = scene->GetEntity(windowID))
-    {
-        window->SetMesh(cube);
-        window->SetMaterial(windowMaterial);
-        window->GetTransform().SetPosition(glm::vec3(0.f, 0.f, 2.f));
     }
 
     auto edgeID = scene->CreateEntity("Edge");
@@ -125,6 +125,22 @@ void ScenePrepare()
             edge->GetTransform().SetPosition(box->GetTransform().GetPosition());
     }
     scene->Reparent(edgeID, boxID);
+
+    auto windowID = scene->CreateEntity("Window");
+    if (auto *window = scene->GetEntity(windowID))
+    {
+        window->SetMesh(cube);
+        window->SetMaterial(windowMaterial);
+        window->GetTransform().SetPosition(glm::vec3(0.f, 0.f, 2.f));
+    }
+
+    auto wallID = scene->CreateEntity("Wall");
+    if (auto *wall = scene->GetEntity(wallID))
+    {
+        wall->SetMesh(plane);
+        wall->SetMaterial(wallMaterial);
+        wall->GetTransform().SetPosition(glm::vec3(2.f, 0.f, 0.f));
+    }
 
     // OBJ
     core::ModelLoadOptions objOpt{};
@@ -186,10 +202,9 @@ void ScenePrepare()
             "skybox/lake/bottom.jpg", // -Y
             "skybox/lake/back.jpg",   // +Z
             "skybox/lake/front.jpg"   // -Z
-        },
-        std::filesystem::path{});
+        });
 
-    skyboxPanorama = std::make_shared<core::EnvironmentMap>("skybox/dream.jpg", std::filesystem::path{});
+    skyboxPanorama = std::make_shared<core::EnvironmentMap>("skybox/dream.jpg");
 
     if (skyboxCube && skyboxCube->IsValid())
     {
