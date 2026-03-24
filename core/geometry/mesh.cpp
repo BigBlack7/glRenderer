@@ -219,7 +219,7 @@ namespace core
 
             for (uint32_t j = 0; j <= longitude; ++j)
             {
-                const float u = static_cast<float>(j) / static_cast<float>(longitude);
+                const float u = static_cast<float>(j) / static_cast<float>(longitude); 
                 const float theta = glm::two_pi<float>() * u;
 
                 const float x = radius * sin_phi * std::cosf(theta);
@@ -229,16 +229,12 @@ namespace core
                 glm::vec3 pos{x, y, z};
                 glm::vec3 n = glm::normalize(pos);
 
-                // 切线沿经度方向(θ的偏导): (-sinθ, 0, cosθ) × 法线垂直分量
-                // 切线tangent = (-sinθ, 0, cosθ) 沿经度方向, 与法线垂直
-                glm::vec3 tangent;
-                tangent.x = -sinf(theta);
-                tangent.y = 0.0f;
-                tangent.z = cosf(theta);
-                tangent = glm::normalize(tangent);
+                // 切线沿经度方向(θ的偏导): (sinθ, 0, -cosθ) × 法线垂直分量
+                // 切线tangent = (sinθ, 0, -cosθ) 沿经度方向, 与法线垂直
+                glm::vec3 tangent = glm::normalize(glm::vec3(std::sinf(theta), 0.0f, -std::cosf(theta)));
 
                 // 处理极点特殊情况(phi=0 或 phi=π时, sin_phi=0, 切线可能失效)
-                if (sin_phi < 1e-6 || sin_phi > glm::pi<float>() - 1e-6)
+                if (sin_phi < 1e-6)
                     tangent = glm::vec3(1.f, 0.f, 0.f); // 极点处切线沿X轴, 副切线沿Z轴(避免零向量)
 
                 vertices.push_back({pos, {1.f - u, 1.f - v}, n, tangent});

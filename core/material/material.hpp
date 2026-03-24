@@ -21,7 +21,8 @@ namespace core
         AO,
         Emissive,
         OpacityMask,
-        Count // 纹理槽数量
+        Height, // for parallax/displacement mapping
+        Count   // 纹理槽数量
     };
 
     class Material final
@@ -32,7 +33,6 @@ namespace core
 
         std::shared_ptr<Shader> mShader{};
         std::array<std::shared_ptr<Texture>, TextureSlotCount> mTextures{};
-        
 
         // 材质特性位掩码
         uint32_t mFeatureFlags{0};

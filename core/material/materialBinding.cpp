@@ -35,6 +35,8 @@ namespace core
             detail::FindFirstUniform(shader, {"uEmissiveSampler"});
         b.mSampler[static_cast<size_t>(TextureSlot::OpacityMask)] =
             detail::FindFirstUniform(shader, {"uOpacitySampler", "uAlphaMaskSampler"});
+        b.mSampler[static_cast<size_t>(TextureSlot::Height)] =
+            detail::FindFirstUniform(shader, {"uHeightSampler", "uParallaxSampler", "uDisplacementSampler"});
 
         b.mMaterialFlags = detail::FindFirstUniform(shader, {"uMaterialFlags"});
         b.mAlphaMode = detail::FindFirstUniform(shader, {"uAlphaMode"});

@@ -26,6 +26,8 @@ std::unique_ptr<core::CameraController> controller = nullptr;
 
 std::unique_ptr<core::Scene> scene = nullptr;
 core::EntityID boxID = core::InvalidEntityID;
+std::shared_ptr<core::Material> boxMaterial = nullptr;
+float heightScale = 0.1f;
 
 core::EntityID objRootID = core::InvalidEntityID;
 
@@ -68,22 +70,25 @@ void ScenePrepare()
     /* 着色器编译阶段 */
     auto phongShader = std::make_shared<core::Shader>("phong/phong.vert", "phong/phong.frag");
     auto edgeShader = std::make_shared<core::Shader>("effect/edge.vert", "effect/edge.frag");
-    auto boxMaterial = std::make_shared<core::Material>(phongShader);
+    boxMaterial = std::make_shared<core::Material>(phongShader);
     auto windowMaterial = std::make_shared<core::Material>(phongShader);
-    auto wallMaterial = std::make_shared<core::Material>(phongShader);
+    auto brainMaterial = std::make_shared<core::Material>(phongShader);
     auto edgeMaterial = std::make_shared<core::Material>(edgeShader);
 
     /* 几何生成阶段 */
     auto cube = core::Mesh::CreateCube(1.f);
-    auto plane = core::Mesh::CreatePlane(1.f);
+    auto sphere = core::Mesh::CreateSphere(1.f);
 
     /* 材质处理阶段 */
     auto albedoInfo = core::Texture::CreateInfo{.__sRGB__ = true};
 
-    auto boxTex = std::make_shared<core::Texture>("box/box.png", 0, albedoInfo);
-    auto boxSMTex = std::make_shared<core::Texture>("box/sp_mask.png", 1);
+    auto boxTex = std::make_shared<core::Texture>("bricks/bricks_albedo.jpg", 0, albedoInfo);
+    auto boxSMTex = std::make_shared<core::Texture>("bricks/bricks_normal.jpg", 1);
+    auto boxHeightTex = std::make_shared<core::Texture>("bricks/bricks_disp.jpg", 2);
     boxMaterial->SetTexture(core::TextureSlot::Albedo, boxTex);
     boxMaterial->SetTexture(core::TextureSlot::MetallicRoughness, boxSMTex);
+    boxMaterial->SetTexture(core::TextureSlot::Height, boxHeightTex); 
+    boxMaterial->SetFloat("uHeightScale", heightScale);
     auto boxState = core::MakeOpaqueState();
     boxState.mStencil.mStencilTest = true;
     boxMaterial->SetRenderState(boxState);
@@ -98,11 +103,11 @@ void ScenePrepare()
     windowMaterial->SetTexture(core::TextureSlot::Albedo, windowTex);
     windowMaterial->SetRenderState(core::MakeTransparentState());
 
-    auto wallTex = std::make_shared<core::Texture>("wall/wall_albedo.jpg", 0, albedoInfo);
-    auto wallNormalTex = std::make_shared<core::Texture>("wall/wall_normal.png", 1);
-    wallMaterial->SetTexture(core::TextureSlot::Albedo, wallTex);
-    wallMaterial->SetTexture(core::TextureSlot::Normal, wallNormalTex);
-    wallMaterial->SetRenderState(core::MakeOpaqueState());
+    auto brainTex = std::make_shared<core::Texture>("brain/brain_albedo.png", 0, albedoInfo);
+    auto brainNormalTex = std::make_shared<core::Texture>("brain/brain_normal.png", 1);
+    brainMaterial->SetTexture(core::TextureSlot::Albedo, brainTex);
+    brainMaterial->SetTexture(core::TextureSlot::Normal, brainNormalTex);
+    brainMaterial->SetRenderState(core::MakeOpaqueState());
 
     /* 实体&场景构造阶段 */
     scene = std::make_unique<core::Scene>();
@@ -134,12 +139,12 @@ void ScenePrepare()
         window->GetTransform().SetPosition(glm::vec3(0.f, 0.f, 2.f));
     }
 
-    auto wallID = scene->CreateEntity("Wall");
-    if (auto *wall = scene->GetEntity(wallID))
+    auto brainID = scene->CreateEntity("Brain");
+    if (auto *brain = scene->GetEntity(brainID))
     {
-        wall->SetMesh(plane);
-        wall->SetMaterial(wallMaterial);
-        wall->GetTransform().SetPosition(glm::vec3(2.f, 0.f, 0.f));
+        brain->SetMesh(sphere);
+        brain->SetMaterial(brainMaterial);
+        brain->GetTransform().SetPosition(glm::vec3(2.f, 0.f, 0.f));
     }
 
     // OBJ
@@ -289,6 +294,7 @@ int main()
         ImGui::SliderFloat3("Box Position", glm::value_ptr(boxPos), -5.f, 5.f);
         ImGui::SliderFloat3("Box Rotation", glm::value_ptr(boxRot), -180.f, 180.f);
         ImGui::SliderFloat3("Box Scale", glm::value_ptr(boxScale), 0.1f, 5.f);
+        ImGui::SliderFloat("Height Scale", &heightScale, 0.01f, 1.f);
 
         ImGui::Separator();
         ImGui::SliderFloat3("Obj Position", glm::value_ptr(objPos), -5.f, 5.f);
@@ -309,6 +315,7 @@ int main()
             box->GetTransform().SetPosition(boxPos);
             box->GetTransform().SetEulerXyzDeg(boxRot);
             box->GetTransform().SetScale(boxScale);
+            boxMaterial->SetFloat("uHeightScale", heightScale);
         }
 
         if (auto *objRoot = scene->GetEntity(objRootID))

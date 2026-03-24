@@ -354,13 +354,27 @@ namespace core
                     aiMaterial,
                     aiSceneRef,
                     modelDir,
-                    {aiTextureType_NORMALS, aiTextureType_NORMAL_CAMERA, aiTextureType_HEIGHT},
+                    {aiTextureType_NORMALS, aiTextureType_NORMAL_CAMERA},
                     options.__flipTextureY__,
                     false,
                     textureCache))
             {
                 GL_INFO("[ModelLoader] '{}' - Normal Map Texture Loaded Successfully", modelName);
                 material->SetTexture(TextureSlot::Normal, std::move(normalMap));
+            }
+
+            // 加载高度/位移贴图
+            if (auto heightMap = LoadTextureWithCache(
+                    aiMaterial,
+                    aiSceneRef,
+                    modelDir,
+                    {aiTextureType_DISPLACEMENT, aiTextureType_HEIGHT},
+                    options.__flipTextureY__,
+                    false,
+                    textureCache))
+            {
+                GL_INFO("[ModelLoader] '{}' - Height Map Texture Loaded Successfully", modelName);
+                material->SetTexture(TextureSlot::Height, std::move(heightMap));
             }
 
             // TODO: AO通道接入后开启

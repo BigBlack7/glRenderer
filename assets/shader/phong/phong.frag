@@ -14,6 +14,7 @@ uniform sampler2D uNormalSampler;
 uniform sampler2D uMetallicRoughSampler;
 uniform sampler2D uAOSampler;
 uniform sampler2D uOpacitySampler;
+uniform sampler2D uHeightSampler;
 
 // uniform
 uniform uint uMaterialFlags;
@@ -22,12 +23,14 @@ uniform float uShininess = 64.0;
 uniform uint uAlphaMode = 0u; // 0 Opaque, 1 Cutout, 2 Transparent
 uniform float uAlphaCutoff = 0.5;
 uniform float uOpacity = 1.0;
+uniform float uHeightScale = 0.1f;
 
 const uint MAT_HAS_ALBEDO_TEX = (1u << 0u); // 漫反射贴图
 const uint MAT_HAS_NORMAL_TEX = (1u << 1u); // 法线向量贴图
 const uint MAT_HAS_METALLIC_ROUGHNESS_TEX = (1u << 2u); // 金属粗糙度贴图
 const uint MAT_HAS_AO_TEX = (1u << 3u); // 环境光遮蔽贴图
 const uint MAT_HAS_OPACITY_TEX = (1u << 5u); // 不透明度贴图
+const uint MAT_HAS_HEIGHT_TEX = (1u << 6u); // 高度/位移贴图
 
 layout(std140, binding = 0)uniform FrameBlock
 {
@@ -38,24 +41,54 @@ layout(std140, binding = 0)uniform FrameBlock
 
 #include "../common/light.glsl"
 
+vec2 SteepParallaxUV(vec2 uv, vec3 V)
+{
+    V = normalize(transpose(oTBN) * V); // 世界空间 坐标转换到uv坐标的切线空间坐标
+    float layer_num = 20.0;
+    float layer_depth = 1.0 / layer_num;
+    vec2 deltaUV = V.xy / V.z * uHeightScale / layer_num;
+    
+    vec2 current_uv = uv;
+    float current_sample_val = texture(uHeightSampler, current_uv).r;
+    float current_layer_depth = 0.0;
+    
+    while(current_sample_val > current_layer_depth)
+    {
+        current_uv -= deltaUV;
+        current_sample_val = texture(uHeightSampler, current_uv).r;
+        current_layer_depth += layer_depth;
+    }
+    
+    vec2 last_uv = current_uv + deltaUV;
+    float last_layer_depth = current_layer_depth - layer_depth;
+    float last_height = texture(uHeightSampler, last_uv).r;
+    float last_length = last_height - last_layer_depth;
+    float current_length = current_layer_depth - current_sample_val;
+    float last_weight = current_length / (last_length + current_length);
+    vec2 target_uv = mix(current_uv, last_uv, last_weight);
+    
+    return target_uv;
+}
+
 void main()
 {
     // common
     vec3 V = normalize(uViewPosTime.xyz - oFragPos);
+    vec2 uv = ((uMaterialFlags & MAT_HAS_HEIGHT_TEX) != 0u) ? SteepParallaxUV(oUV, V) : oUV;
     
     // material features
-    vec3 object_color = ((uMaterialFlags & MAT_HAS_ALBEDO_TEX) != 0u) ? texture(uAlbedoSampler, oUV).rgb : uBaseColor;
-    vec3 N = ((uMaterialFlags & MAT_HAS_NORMAL_TEX) != 0u) ? normalize(oTBN * ((texture(uNormalSampler, oUV).rgb) * 2.0 - vec3(1.0))) : normalize(oNormal);
+    vec3 object_color = ((uMaterialFlags & MAT_HAS_ALBEDO_TEX) != 0u) ? texture(uAlbedoSampler, uv).rgb : uBaseColor;
+    vec3 N = ((uMaterialFlags & MAT_HAS_NORMAL_TEX) != 0u) ? normalize(oTBN * ((texture(uNormalSampler, uv).rgb) * 2.0 - vec3(1.0))) : normalize(oNormal);
     
-    float base_alpha = ((uMaterialFlags & MAT_HAS_ALBEDO_TEX) != 0u) ? texture(uAlbedoSampler, oUV).a : 1.0;
-    float opacity_mask = ((uMaterialFlags & MAT_HAS_OPACITY_TEX) != 0u) ? texture(uOpacitySampler, oUV).r : 1.0;
+    float base_alpha = ((uMaterialFlags & MAT_HAS_ALBEDO_TEX) != 0u) ? texture(uAlbedoSampler, uv).a : 1.0;
+    float opacity_mask = ((uMaterialFlags & MAT_HAS_OPACITY_TEX) != 0u) ? texture(uOpacitySampler, uv).r : 1.0;
     float alpha = clamp(base_alpha * opacity_mask * uOpacity, 0.0, 1.0);
     
     if (uAlphaMode == 1u && alpha < uAlphaCutoff)discard;
     if (uAlphaMode == 0u)alpha = 1.0;
     
-    float specular_mask = ((uMaterialFlags & MAT_HAS_METALLIC_ROUGHNESS_TEX) != 0u) ? texture(uMetallicRoughSampler, oUV).r : 1.0;
-    float ao_mask = ((uMaterialFlags & MAT_HAS_AO_TEX) != 0u) ? texture(uAOSampler, oUV).r : 1.0;
+    float specular_mask = ((uMaterialFlags & MAT_HAS_METALLIC_ROUGHNESS_TEX) != 0u) ? texture(uMetallicRoughSampler, uv).r : 1.0;
+    float ao_mask = ((uMaterialFlags & MAT_HAS_AO_TEX) != 0u) ? texture(uAOSampler, uv).r : 1.0;
     
     vec3 diffuse_color = vec3(0.0);
     vec3 specular_color = vec3(0.0);
