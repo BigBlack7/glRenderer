@@ -140,3 +140,25 @@ vec3 GetSpotLight(SpotLightGPU light, vec3 fragPos, vec3 normal, vec3 viewDir, v
     
     return radiance;
 }
+
+// shadow
+float GetDirectionalShadow(sampler2D shadowMap, vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
+{
+    // 从光空间转换到NDC坐标
+    vec3 projCoords = fragPosLightSpace.xyz / max(fragPosLightSpace.w, EPS);
+    projCoords = projCoords * 0.5 + 0.5;
+    
+    // 如果片段坐标超出阴影贴图的有效范围, 则不在阴影中
+    // z > 1.0 表示深度超出远剪裁面, x/y超出[0,1]表示在阴影贴图之外
+    if (projCoords.z > 1.0 || projCoords.x < 0.0 || projCoords.x > 1.0 || projCoords.y < 0.0 || projCoords.y > 1.0)return 0.0;
+    
+    float currentDepth = projCoords.z;
+    float closestDepth = texture(shadowMap, projCoords.xy).r;
+    // 计阴影偏移量, 用于防止自阴影伪影
+    // 当法线与光照方向垂直时, 偏移量增大; 平行时, 偏移量减小
+    // 避免表面自身遮挡自己造成的阴影错误
+    float bias = max(0.0008 * (1.0 - dot(normalize(normal), normalize(lightDir))), 0.00008);
+    
+    // 如果当前深度减去偏移后大于最近深度说明被遮挡(在阴影中)
+    return (currentDepth - bias) > closestDepth ? 1.0 : 0.0;
+}

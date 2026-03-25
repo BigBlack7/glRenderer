@@ -1,7 +1,7 @@
 ﻿# GLRenderer
 
 - Build it by MSVC with C++20.
-- Refer to LearOpenGL, Godot, Unity and So on.
+- Refer to LearOpenGL, Godot, EnTT and So on.
 
 # NameFormat
 
@@ -33,14 +33,14 @@
   - Holds position, rotation, scale(only for itself)
 - ✅ `Material`
   - Manages shader/texture/uniform concepts
-- ⬜ `Light`
-  - ✅ Directional Light
-  - ⬜ Point Light
-  - ⬜ Spot Light
+- ✅ `Light`
+  - Directional Light
+  - Point Light
+  - Spot Light
 - ✅ `Entity`
   - A renderable unit: binds `Mesh + Material + Transform`
   - one parent(index), multiple children
-- ⬜ `Model`
+- ✅ `Model`
   - Holds a container of `Entity`
 - ✅ `Scene`
   - Holds `Entity` list, `Model` list, `Light` list
@@ -49,12 +49,12 @@
   - Stateless service entry
   - Renderer Pass & Renderer Graph Architecture
   - Interface: `Render(const Scene&, const Camera&)`
-- ⬜ `Assimp Model Loader`
-- ⬜ `Shadow Mapping`
+- ✅ `Assimp Model Loader`
+- ✅ `Shadow Mapping`
 - ⬜ `Disney PBR`
 - ⬜ `NPR`
 - ⬜ `IBL`
-- ⬜ `Post Process`
+- ✅ `Post Process`
 - ⬜ `Deferred Rendering Pipeline`
 - ⬜ `IMGUI Editor`
 

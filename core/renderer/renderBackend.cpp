@@ -210,6 +210,8 @@ namespace core
         mInstancedLayoutCache.clear();
         mInstanceModelScratch.clear();
         mInstanceNormalScratch.clear();
+        mDirectionalShadowTexture = 0;
+        mDirectionalLightSpaceVP = glm::mat4(1.f);
 
         // 初始化默认渲染状态 - 不透明状态
         mHasAppliedState = false;
@@ -231,6 +233,8 @@ namespace core
         mInstancedLayoutCache.clear();
         mInstanceModelScratch.clear();
         mInstanceNormalScratch.clear();
+        mDirectionalShadowTexture = 0;
+        mDirectionalLightSpaceVP = glm::mat4(1.f);
         mInitialized = false;
         mHasAppliedState = false;
 
@@ -678,6 +682,7 @@ namespace core
             {
                 ++stats.__programBinds__;
                 BindProgramBlocks(shader);
+                ApplyShadowGlobals(shader, stats);
                 lastShader = &shader;
                 lastMaterial = nullptr;
                 lastMaterialVersion = 0u;
@@ -685,6 +690,7 @@ namespace core
             else if (lastShader != &shader)
             {
                 BindProgramBlocks(shader);
+                ApplyShadowGlobals(shader, stats);
                 lastShader = &shader;
                 lastMaterial = nullptr;
                 lastMaterialVersion = 0u;
@@ -825,6 +831,7 @@ namespace core
             ++stats.__programBinds__;
 
         BindProgramBlocks(shader);
+        ApplyShadowGlobals(shader, stats);
         ApplyRenderState(material.GetRenderState());
         ApplyMaterial(material, shader, stats);
 
@@ -889,9 +896,128 @@ namespace core
         DrawItems(queue.GetTransparentItems(), stats);
     }
 
+    void RenderBackend::DrawShadowDepth(std::span<const DrawItem> items, std::span<const DrawBatch> batches, const Shader &shader, const glm::mat4 &lightVP, RenderProfiler &stats)
+    {
+        if (items.empty())
+            return;
+
+        if (mStateCache.UseProgram(shader.GetID())) // 绑定阴影着色器程序
+            ++stats.__programBinds__;
+
+        shader.SetMat4Optional("uLightVP", lightVP);
+        shader.SetUIntOptional("uUseInstancing", 0u); // 默认不使用实例化
+
+        // 绘制一组阴影项(不使用实例化)
+        auto DrawShadowItems = [&](std::span<const DrawItem> drawItems)
+        {
+            for (const DrawItem &item : drawItems)
+            {
+                if (!item.__mesh__)
+                    continue;
+
+                shader.SetMat4Optional("uM", item.__world__);
+                DrawMesh(*item.__mesh__, stats);
+            }
+        };
+
+        if (batches.empty()) // 如果没有批次信息直接逐个绘制所有物体
+        {
+            DrawShadowItems(items);
+            return;
+        }
+
+        constexpr uint32_t MinShadowInstanceCount = 4u; // 只有当同一网格的物体数量 >= 4 时才使用实例化渲染
+
+        for (const DrawBatch &batch : batches) // 遍历所有批次
+        {
+            if (batch.__count__ == 0u) // 跳过空批次
+                continue;
+
+            // 获取批次在items数组中的起始位置并创建该批次的子视图
+            const DrawItem *begin = items.data() + batch.__start__;
+            std::span<const DrawItem> batchItems(begin, batch.__count__);
+
+            if (batch.__count__ < MinShadowInstanceCount) // 物体数量不足阈值, 直接绘制
+            {
+                shader.SetUIntOptional("uUseInstancing", 0u);
+                DrawShadowItems(batchItems);
+                continue;
+            }
+
+            const DrawItem &head = batchItems.front(); // 获取批次第一个物体作为参考(检查网格一致性)
+            if (!head.__mesh__)                        // 检查第一个物体的网格是否存在, 不存在则使用普通绘制
+            {
+                shader.SetUIntOptional("uUseInstancing", 0u);
+                DrawShadowItems(batchItems);
+                continue;
+            }
+
+            // 检查批次中所有物体的网格是否一致
+            bool batchMeshConsistent = true;
+            for (const DrawItem &item : batchItems)
+            {
+                if (item.__mesh__ != head.__mesh__)
+                {
+                    batchMeshConsistent = false;
+                    break;
+                }
+            }
+
+            // 如果网格不一致, 使用普通绘制
+            if (!batchMeshConsistent)
+            {
+                shader.SetUIntOptional("uUseInstancing", 0u);
+                DrawShadowItems(batchItems);
+                continue;
+            }
+
+            // ========== 使用实例化渲染 ==========
+            shader.SetUIntOptional("uUseInstancing", 1u);
+            if (!UploadInstanceData(batchItems)) // 上传实例数据
+            {
+                shader.SetUIntOptional("uUseInstancing", 0u); // 上传失败回退到普通绘制
+                DrawShadowItems(batchItems);
+                continue;
+            }
+
+            EnsureInstancedLayout(*head.__mesh__);
+            DrawMeshInstanced(*head.__mesh__, static_cast<uint32_t>(batchItems.size()), stats);
+        }
+
+        shader.SetUIntOptional("uUseInstancing", 0u);
+    }
+
     void RenderBackend::ApplyPassState(const RenderStateDesc &state)
     {
         ApplyRenderState(state);
+    }
+
+    void RenderBackend::SetDirectionalShadow(GLuint shadowTexture, const glm::mat4 &lightSpaceVP)
+    {
+        mDirectionalShadowTexture = shadowTexture;
+        mDirectionalLightSpaceVP = lightSpaceVP;
+    }
+
+    void RenderBackend::ClearDirectionalShadow()
+    {
+        mDirectionalShadowTexture = 0;
+        mDirectionalLightSpaceVP = glm::mat4(1.f);
+    }
+
+    void RenderBackend::ApplyShadowGlobals(const Shader &shader, RenderProfiler &stats)
+    {
+        shader.SetMat4Optional("uLightSpaceVP", mDirectionalLightSpaceVP);
+        shader.SetUIntOptional("uHasDirectionalShadow", mDirectionalShadowTexture != 0 ? 1u : 0u);
+
+        // 绑定方向阴影贴图纹理到着色器
+        const GLint shadowMapLoc = shader.FindUniformLocation("uShadowMap");
+        if (shadowMapLoc < 0)
+            return;
+
+        if (mStateCache.BindTexture2D(DirectionalShadowTextureUnit, mDirectionalShadowTexture))
+            ++stats.__textureBinds__;
+
+        shader.SetInt(shadowMapLoc, static_cast<int>(DirectionalShadowTextureUnit));
     }
 
     void RenderBackend::DrawFullscreenTexture(const Shader &shader, GLuint colorTexture, RenderProfiler &stats)

@@ -7,6 +7,7 @@ in vec2 oUV;
 in vec3 oNormal;
 in vec3 oFragPos;
 in mat3 oTBN;
+in vec4 oFragPosLightSpace;
 
 // sampler
 uniform sampler2D uAlbedoSampler;
@@ -23,7 +24,6 @@ uniform float uShininess = 64.0;
 uniform uint uAlphaMode = 0u; // 0 Opaque, 1 Cutout, 2 Transparent
 uniform float uAlphaCutoff = 0.5;
 uniform float uOpacity = 1.0;
-uniform float uHeightScale = 0.1f;
 
 const uint MAT_HAS_ALBEDO_TEX = (1u << 0u); // 漫反射贴图
 const uint MAT_HAS_NORMAL_TEX = (1u << 1u); // 法线向量贴图
@@ -41,12 +41,16 @@ layout(std140, binding = 0)uniform FrameBlock
 
 #include "../common/light.glsl"
 
+// shadow
+uniform sampler2D uShadowMap;
+uniform uint uHasDirectionalShadow = 0u;
+
 vec2 SteepParallaxUV(vec2 uv, vec3 V)
 {
     V = normalize(transpose(oTBN) * V); // 世界空间 坐标转换到uv坐标的切线空间坐标
     float layer_num = 20.0;
     float layer_depth = 1.0 / layer_num;
-    vec2 deltaUV = V.xy / V.z * uHeightScale / layer_num;
+    vec2 deltaUV = V.xy / V.z * 0.1 / layer_num;
     
     vec2 current_uv = uv;
     float current_sample_val = texture(uHeightSampler, current_uv).r;
@@ -100,8 +104,9 @@ void main()
         DirectionalLightGPU light = uDirectionalLights[i];
         vec3 diffuse, specular;
         GetDirectionalLight(light, N, V, object_color, uShininess, specular_mask, diffuse, specular);
-        diffuse_color += diffuse;
-        specular_color += specular;
+        float shadow = (uHasDirectionalShadow != 0u) ? GetDirectionalShadow(uShadowMap, oFragPosLightSpace, N, normalize(-light.direction.xyz)) : 0.0;
+        diffuse_color += diffuse * (1.0 - shadow);
+        specular_color += specular * (1.0 - shadow);
     }
     
     // point light

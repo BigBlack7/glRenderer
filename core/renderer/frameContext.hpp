@@ -18,6 +18,14 @@ namespace core
      */
     struct FrameContext final
     {
+        struct ShadowFrameData final
+        {
+            bool __hasDirectionalShadow__{false};        // 标记当前帧是否存在方向阴影
+            uint32_t __directionalShadowTexture__{0};    // 方向阴影贴图的纹理句柄
+            glm::mat4 __directionalLightVP__{1.f};       // 方向光源的视图投影矩阵
+            uint32_t __directionalShadowResolution__{0}; // 方向阴影贴图的分辨率
+        };
+
         Scene *__scene__{nullptr};
         const Camera *__camera__{nullptr};
         float __timeSec__{0.f};
@@ -26,6 +34,8 @@ namespace core
         FrameBuffer *__sceneColorTarget__{nullptr};
         uint32_t __targetWidth__{0};
         uint32_t __targetHeight__{0};
+
+        ShadowFrameData __shadow__{};
 
         RenderQueue __renderQueue__{};
         RenderProfiler __stats__{};

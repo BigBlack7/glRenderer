@@ -19,6 +19,7 @@ out vec2 oUV;
 out vec3 oNormal;
 out vec3 oFragPos;
 out mat3 oTBN;
+out vec4 oFragPosLightSpace;
 
 layout(std140, binding = 0)uniform FrameBlock
 {
@@ -31,6 +32,7 @@ layout(std140, binding = 0)uniform FrameBlock
 uniform mat4 uM;
 uniform mat3 uN;
 uniform uint uUseInstancing = 0u;
+uniform mat4 uLightSpaceVP = mat4(1.0);
 
 void main()
 {
@@ -49,6 +51,7 @@ void main()
     oUV = lUV;
     oNormal = normalize(normalMat * lNormal);
     oFragPos = worldPos.xyz;
+    oFragPosLightSpace = uLightSpaceVP * worldPos;
     
     // TBN
     vec3 T = normalize(mat3(model) * lTangent);

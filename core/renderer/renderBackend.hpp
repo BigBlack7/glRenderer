@@ -59,6 +59,10 @@ namespace core
 
         GLuint mFullscreenTriangleVAO{0}; // 全屏三角形VAO
 
+        static constexpr uint32_t DirectionalShadowTextureUnit = 15u; // 方向阴影贴图纹理单元
+        GLuint mDirectionalShadowTexture{0};                          // 方向阴影贴图的纹理句柄
+        glm::mat4 mDirectionalLightSpaceVP{1.f};                      // 方向光源的视图投影矩阵
+
     private:
         /// @brief 为着色器程序绑定uniform block到指定槽位
         /// @param shader 目标着色器
@@ -109,6 +113,11 @@ namespace core
         /// @return 材质绑定缓存
         const MaterialShaderBindings &GetMaterialBindings(const Shader &shader);
 
+        /// @brief 为当前shader应用全局阴影资源和矩阵
+        /// @param shader 着色器对象
+        /// @param stats 渲染性能统计
+        void ApplyShadowGlobals(const Shader &shader, RenderProfiler &stats);
+
     public:
         /// @brief 初始化渲染后端, 创建UBO并设置基础OpenGL状态
         /// @return 初始化成功返回true
@@ -154,8 +163,24 @@ namespace core
         /// @param stats 渲染性能统计
         void DrawTransparentQueue(const RenderQueue &queue, RenderProfiler &stats);
 
+        /// @brief 绘制阴影深度队列(支持批次实例化)
+        /// @param items 绘制项数组
+        /// @param batches 批次信息(与items一致)
+        /// @param shader 阴影着色器
+        /// @param lightVP 光源VP矩阵
+        /// @param stats 渲染性能统计
+        void DrawShadowDepth(std::span<const DrawItem> items, std::span<const DrawBatch> batches, const Shader &shader, const glm::mat4 &lightVP, RenderProfiler &stats);
+
         /// @brief 应用Pass级基线状态(不依赖材质, 保证每个pass入口确定性)
         void ApplyPassState(const RenderStateDesc &state);
+
+        /// @brief 设置方向光阴影图资源
+        /// @param shadowTexture 阴影深度纹理
+        /// @param lightSpaceVP 光空间VP矩阵
+        void SetDirectionalShadow(GLuint shadowTexture, const glm::mat4 &lightSpaceVP);
+
+        /// @brief 清理方向光阴影图资源
+        void ClearDirectionalShadow();
 
         /// @brief 绘制全屏纹理
         /// @param shader 着色器程序
