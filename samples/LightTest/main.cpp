@@ -33,6 +33,10 @@ core::LightID mainDirLightID = core::InvalidLightID;
 core::LightID pointLightID = core::InvalidLightID;
 core::LightID spotLightID = core::InvalidLightID;
 
+// 阴影UI参数(用于主方向光): 统一收敛到LightShadowSettings
+core::LightShadowSettings shadowSettings{};
+int shadowTechnique = static_cast<int>(core::ShadowTechnique::PoissonPCF);
+
 // skybox
 std::shared_ptr<core::EnvironmentMap> skyboxCube = nullptr;
 std::shared_ptr<core::EnvironmentMap> skyboxPanorama = nullptr;
@@ -46,6 +50,11 @@ void BuildLights()
     mainLight.SetDirection(glm::vec3(-1.f, -1.f, -1.f));
     mainLight.SetColor(glm::vec3(1.f, 1.f, 1.f));
     mainLight.SetIntensity(0.9f);
+
+    // 初始化主方向光阴影配置
+    shadowSettings.mTechnique = static_cast<core::ShadowTechnique>(shadowTechnique);
+    mainLight.SetShadowSettings(shadowSettings);
+
     mainDirLightID = scene->CreateDirectionalLight(mainLight);
 
     core::PointLight pointLight; // 创建点光源
@@ -86,7 +95,7 @@ void ScenePrepare()
     auto boxHeightTex = std::make_shared<core::Texture>("bricks/bricks_disp.jpg", 2);
     boxMaterial->SetTexture(core::TextureSlot::Albedo, boxTex);
     boxMaterial->SetTexture(core::TextureSlot::MetallicRoughness, boxSMTex);
-    boxMaterial->SetTexture(core::TextureSlot::Height, boxHeightTex); 
+    boxMaterial->SetTexture(core::TextureSlot::Height, boxHeightTex);
     auto boxState = core::MakeOpaqueState();
     boxState.mStencil.mStencilTest = true;
     boxMaterial->SetRenderState(boxState);
@@ -318,6 +327,57 @@ int main()
 
         const char *skyboxItems[] = {"Cubemap (6 Faces)", "Panorama (1 Image)"};
         ImGui::Combo("Skybox Source", &skyboxSource, skyboxItems, IM_ARRAYSIZE(skyboxItems));
+
+        ImGui::Separator();
+        ImGui::Text("Directional Shadow");
+        ImGui::Checkbox("Shadow Enabled", &shadowSettings.mEnabled);
+
+        const char *shadowTechniqueItems[] = {"None", "Hard", "PCF", "Poisson PCF", "PCSS", "CSM (Reserved)"};
+        if (ImGui::Combo("Shadow Technique", &shadowTechnique, shadowTechniqueItems, IM_ARRAYSIZE(shadowTechniqueItems)))
+        {
+            shadowSettings.mTechnique = static_cast<core::ShadowTechnique>(shadowTechnique);
+        }
+
+        ImGui::SliderFloat("Bias Constant", &shadowSettings.mBiasConstant, 0.0f, 0.005f, "%.6f", ImGuiSliderFlags_Logarithmic);
+        ImGui::SliderFloat("Bias Slope", &shadowSettings.mBiasSlope, 0.0f, 0.02f, "%.6f", ImGuiSliderFlags_Logarithmic);
+
+        if (shadowTechnique == static_cast<int>(core::ShadowTechnique::PCF))
+        {
+            ImGui::SliderFloat("PCF Radius Texels", &shadowSettings.mPCFRadiusTexels, 0.0f, 4.0f, "%.2f");
+        }
+        else if (shadowTechnique == static_cast<int>(core::ShadowTechnique::PoissonPCF))
+        {
+            ImGui::SliderFloat("Poisson Radius UV", &shadowSettings.mPoissonRadiusUV, 0.0001f, 0.02f, "%.5f", ImGuiSliderFlags_Logarithmic);
+
+            int poissonSamplesUI = static_cast<int>(shadowSettings.mPoissonSampleCount);
+            if (ImGui::SliderInt("Poisson Samples", &poissonSamplesUI, 1, 32))
+            {
+                shadowSettings.mPoissonSampleCount = static_cast<uint32_t>(poissonSamplesUI);
+            }
+        }
+        else if (shadowTechnique == static_cast<int>(core::ShadowTechnique::PCSS))
+        {
+            ImGui::SliderFloat("Blocker Search Texels", &shadowSettings.mPCSSBlockerSearchTexels, 0.5f, 12.0f, "%.2f");
+            ImGui::SliderFloat("Light Size Texels", &shadowSettings.mPCSSLightSizeTexels, 1.0f, 64.0f, "%.2f");
+            ImGui::SliderFloat("Min Filter Texels", &shadowSettings.mPCSSMinFilterTexels, 0.0f, 8.0f, "%.2f");
+            ImGui::SliderFloat("Max Filter Texels", &shadowSettings.mPCSSMaxFilterTexels, 1.0f, 96.0f, "%.2f");
+
+            int blockerSamplesUI = static_cast<int>(shadowSettings.mPCSSBlockerSampleCount);
+            if (ImGui::SliderInt("Blocker Samples", &blockerSamplesUI, 1, 32))
+            {
+                shadowSettings.mPCSSBlockerSampleCount = static_cast<uint32_t>(blockerSamplesUI);
+            }
+
+            int filterSamplesUI = static_cast<int>(shadowSettings.mPCSSFilterSampleCount);
+            if (ImGui::SliderInt("Filter Samples", &filterSamplesUI, 1, 32))
+            {
+                shadowSettings.mPCSSFilterSampleCount = static_cast<uint32_t>(filterSamplesUI);
+            }
+        }
+        else if (shadowTechnique == static_cast<int>(core::ShadowTechnique::CSM))
+        {
+            ImGui::TextUnformatted("CSM shading path is reserved and not implemented yet.");
+        }
         ImGui::End();
 
         if (auto *box = scene->GetEntity(boxID))
@@ -351,6 +411,11 @@ int main()
 
         scene->SetSkyboxEnabled(skyboxEnabled);
         scene->SetSkyboxIntensity(skyboxIntensity);
+
+        if (auto *mainLight = scene->GetDirectionalLight(mainDirLightID))
+        {
+            mainLight->SetShadowSettings(shadowSettings);
+        }
 
         renderer->SetClearColor(clearColor);
         renderer->Render(*scene, *camera, static_cast<float>(glfwGetTime()));

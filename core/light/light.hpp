@@ -1,10 +1,49 @@
 ﻿#pragma once
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 
 namespace core
 {
+    enum class ShadowTechnique : uint32_t
+    {
+        None = 0,
+        Hard = 1,
+        PCF = 2,
+        PoissonPCF = 3,
+        PCSS = 4,
+        CSM = 5
+    };
+
+    struct LightShadowSettings final
+    {
+        bool mEnabled{true};
+        ShadowTechnique mTechnique{ShadowTechnique::PoissonPCF};
+
+        // 通用偏移参数
+        float mBiasConstant{0.00008f};
+        float mBiasSlope{0.0008f};
+
+        // PCF w/o Poisson
+        float mPCFRadiusTexels{1.f};
+        float mPoissonRadiusUV{0.003f};
+        uint32_t mPoissonSampleCount{16u};
+
+        // PCSS
+        float mPCSSBlockerSearchTexels{3.f};
+        float mPCSSLightSizeTexels{20.f};
+        float mPCSSMinFilterTexels{1.f};
+        float mPCSSMaxFilterTexels{24.f};
+        uint32_t mPCSSBlockerSampleCount{16u};
+        uint32_t mPCSSFilterSampleCount{24u};
+
+        // CSM
+        uint32_t mCascadeCount{1u};
+        float mCascadeBlend{0.f};
+    };
+
     enum class LightType : uint8_t
     {
         Directional = 0,
@@ -18,6 +57,7 @@ namespace core
         bool mEnabled{true};
         glm::vec3 mColor{1.f, 1.f, 1.f};
         float mIntensity{1.f};
+        LightShadowSettings mShadow{};
         uint64_t mVersion{0};
 
     protected:
@@ -55,6 +95,97 @@ namespace core
             BumpVersion();
         }
         float GetIntensity() const noexcept { return mIntensity; }
+
+        void SetShadowSettings(const LightShadowSettings &settings) noexcept
+        {
+            mShadow = settings;
+            BumpVersion();
+        }
+
+        void SetShadowEnabled(bool enabled) noexcept
+        {
+            if (mShadow.mEnabled == enabled)
+                return;
+
+            mShadow.mEnabled = enabled;
+            BumpVersion();
+        }
+
+        void SetShadowTechnique(ShadowTechnique technique) noexcept
+        {
+            if (mShadow.mTechnique == technique)
+                return;
+
+            mShadow.mTechnique = technique;
+            BumpVersion();
+        }
+
+        void SetShadowBias(float constantBias, float slopeBias) noexcept
+        {
+            constantBias = std::max(0.f, constantBias);
+            slopeBias = std::max(0.f, slopeBias);
+            if (std::abs(mShadow.mBiasConstant - constantBias) <= 1e-6f && std::abs(mShadow.mBiasSlope - slopeBias) <= 1e-6f)
+                return;
+
+            mShadow.mBiasConstant = constantBias;
+            mShadow.mBiasSlope = slopeBias;
+            BumpVersion();
+        }
+
+        void SetShadowPCFParams(float radiusTexels) noexcept
+        {
+            radiusTexels = std::max(0.f, radiusTexels);
+            if (std::abs(mShadow.mPCFRadiusTexels - radiusTexels) <= 1e-6f)
+                return;
+
+            mShadow.mPCFRadiusTexels = radiusTexels;
+            BumpVersion();
+        }
+
+        void SetShadowPoissonParams(float radiusUV, uint32_t sampleCount) noexcept
+        {
+            radiusUV = std::max(0.f, radiusUV);
+            sampleCount = std::max(1u, sampleCount);
+            if (std::abs(mShadow.mPoissonRadiusUV - radiusUV) <= 1e-6f && mShadow.mPoissonSampleCount == sampleCount)
+                return;
+
+            mShadow.mPoissonRadiusUV = radiusUV;
+            mShadow.mPoissonSampleCount = sampleCount;
+            BumpVersion();
+        }
+
+        void SetShadowPCSSParams(float blockerSearchTexels,
+                                 float lightSizeTexels,
+                                 float minFilterTexels,
+                                 float maxFilterTexels,
+                                 uint32_t blockerSampleCount,
+                                 uint32_t filterSampleCount) noexcept
+        {
+            blockerSearchTexels = std::max(0.f, blockerSearchTexels);
+            lightSizeTexels = std::max(0.f, lightSizeTexels);
+            minFilterTexels = std::max(0.f, minFilterTexels);
+            maxFilterTexels = std::max(minFilterTexels, maxFilterTexels);
+            blockerSampleCount = std::max(1u, blockerSampleCount);
+            filterSampleCount = std::max(1u, filterSampleCount);
+
+            if (std::abs(mShadow.mPCSSBlockerSearchTexels - blockerSearchTexels) <= 1e-6f &&
+                std::abs(mShadow.mPCSSLightSizeTexels - lightSizeTexels) <= 1e-6f &&
+                std::abs(mShadow.mPCSSMinFilterTexels - minFilterTexels) <= 1e-6f &&
+                std::abs(mShadow.mPCSSMaxFilterTexels - maxFilterTexels) <= 1e-6f &&
+                mShadow.mPCSSBlockerSampleCount == blockerSampleCount &&
+                mShadow.mPCSSFilterSampleCount == filterSampleCount)
+                return;
+
+            mShadow.mPCSSBlockerSearchTexels = blockerSearchTexels;
+            mShadow.mPCSSLightSizeTexels = lightSizeTexels;
+            mShadow.mPCSSMinFilterTexels = minFilterTexels;
+            mShadow.mPCSSMaxFilterTexels = maxFilterTexels;
+            mShadow.mPCSSBlockerSampleCount = blockerSampleCount;
+            mShadow.mPCSSFilterSampleCount = filterSampleCount;
+            BumpVersion();
+        }
+
+        const LightShadowSettings &GetShadowSettings() const noexcept { return mShadow; }
 
         uint64_t GetVersion() const noexcept { return mVersion; }
     };

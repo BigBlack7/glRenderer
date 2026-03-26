@@ -101,6 +101,10 @@ namespace core
             if (light.GetIntensity() <= 0.f)
                 continue;
 
+            const LightShadowSettings &shadow = light.GetShadowSettings();
+            if (!shadow.mEnabled || shadow.mTechnique == ShadowTechnique::None)
+                continue;
+
             return &light; // 返回第一个启用的定向光
         }
 

@@ -9,6 +9,7 @@
 #include "utils/logger.hpp"
 #include <limits>
 #include <cstdint>
+#include <algorithm>
 
 namespace core
 {
@@ -335,6 +336,30 @@ namespace core
             // 填充GPU结构体数据
             lightBlock.uDirectionalLights[activeDirCount].direction = glm::vec4(light.GetDirection(), 0.f);
             lightBlock.uDirectionalLights[activeDirCount].colorIntensity = glm::vec4(light.GetColor(), light.GetIntensity());
+
+            // 填充阴影参数
+            const LightShadowSettings &shadow = light.GetShadowSettings();
+            lightBlock.uDirectionalLights[activeDirCount].shadowParams0 = glm::vec4(
+                shadow.mEnabled ? 1.f : 0.f,
+                static_cast<float>(static_cast<uint32_t>(shadow.mTechnique)),
+                shadow.mBiasConstant,
+                shadow.mBiasSlope);
+            lightBlock.uDirectionalLights[activeDirCount].shadowParams1 = glm::vec4(
+                shadow.mPCFRadiusTexels,
+                shadow.mPoissonRadiusUV,
+                static_cast<float>(std::clamp(shadow.mPoissonSampleCount, 1u, 32u)),
+                0.f);
+            lightBlock.uDirectionalLights[activeDirCount].shadowParams2 = glm::vec4(
+                shadow.mPCSSBlockerSearchTexels,
+                shadow.mPCSSLightSizeTexels,
+                shadow.mPCSSMinFilterTexels,
+                shadow.mPCSSMaxFilterTexels);
+            lightBlock.uDirectionalLights[activeDirCount].shadowParams3 = glm::vec4(
+                static_cast<float>(std::clamp(shadow.mPCSSBlockerSampleCount, 1u, 32u)),
+                static_cast<float>(std::clamp(shadow.mPCSSFilterSampleCount, 1u, 32u)),
+                static_cast<float>(std::max(shadow.mCascadeCount, 1u)),
+                shadow.mCascadeBlend);
+
             dirVersions[activeDirCount] = light.GetVersion();
             ++activeDirCount;
         }
@@ -1010,7 +1035,7 @@ namespace core
         shader.SetUIntOptional("uHasDirectionalShadow", mDirectionalShadowTexture != 0 ? 1u : 0u);
 
         // 绑定方向阴影贴图纹理到着色器
-        const GLint shadowMapLoc = shader.FindUniformLocation("uShadowMap");
+        const GLint shadowMapLoc = shader.FindUniformLocation("uShadowMapSampler");
         if (shadowMapLoc < 0)
             return;
 
