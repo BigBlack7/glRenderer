@@ -43,7 +43,13 @@ layout(std140, binding = 0)uniform FrameBlock
 
 // shadow
 uniform sampler2D uShadowMapSampler;
+uniform sampler2DArray uShadowMapArraySampler;
 uniform uint uHasDirectionalShadow = 0u;
+uniform uint uHasDirectionalCSM = 0u;
+uniform uint uDirectionalCascadeCount = 0u;
+uniform float uDirectionalCascadeSplits[4];
+uniform float uDirectionalCascadeUVScales[4];
+uniform mat4 uDirectionalLightVPArray[4];
 
 vec2 SteepParallaxUV(vec2 uv, vec3 V)
 {
@@ -104,7 +110,21 @@ void main()
         DirectionalLightGPU light = uDirectionalLights[i];
         vec3 diffuse, specular;
         GetDirectionalLight(light, N, V, object_color, uShininess, specular_mask, diffuse, specular);
-        float shadow = (uHasDirectionalShadow != 0u) ? EvaluateDirectionalShadow(uShadowMapSampler, oFragPosLightSpace, N, normalize(-light.direction.xyz), light) : 0.0;
+        float viewDepth = -(uV * vec4(oFragPos, 1.0)).z;
+        float shadow = (uHasDirectionalShadow != 0u) ? EvaluateDirectionalShadow(uShadowMapSampler,
+            uShadowMapArraySampler,
+            oFragPosLightSpace,
+            oFragPos,
+            viewDepth,
+            N,
+            normalize(-light.direction.xyz),
+            light,
+            uHasDirectionalCSM,
+            uDirectionalCascadeCount,
+            uDirectionalCascadeSplits,
+            uDirectionalCascadeUVScales,
+        uDirectionalLightVPArray) : 0.0;
+        
         diffuse_color += diffuse * (1.0 - shadow);
         specular_color += specular * (1.0 - shadow);
     }

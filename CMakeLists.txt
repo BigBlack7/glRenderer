@@ -1,9 +1,4 @@
 cmake_minimum_required(VERSION 3.20)
-
-if(POLICY CMP0091)
-    cmake_policy(SET CMP0091 NEW)
-endif()
-
 project(glRenderer LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -12,10 +7,8 @@ set(CMAKE_BUILD_TYPE Release)
 
 # compiler options
 if(MSVC)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL") # 多线程调试DLL运行时库
-    add_compile_options(/wd4100) # 禁用特定警告: C4100 "未引用的形参"
-    add_compile_options(/MP) # 启用多处理器编译: 加快编译速度, 利用多核CPU并行编译
-    add_compile_options(/W4) # 设置警告等级: /W4 最高警告等级, 帮助发现潜在问题
+    add_compile_options(/MP) # 多核CPU并行编译
+    add_compile_options(/W4) # 设置 /W4 最高警告等级
 
     # 编译器优化: Release模式下启用/O2优化(最大速度优化)
     set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /O2")

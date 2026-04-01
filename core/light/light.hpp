@@ -22,26 +22,28 @@ namespace core
         bool mEnabled{true};
         ShadowTechnique mTechnique{ShadowTechnique::PoissonPCF};
 
-        // 通用偏移参数
-        float mBiasConstant{0.00008f};
-        float mBiasSlope{0.0008f};
+        // 偏小会 acne(条纹自阴影), 偏大会 peter-panning(阴影悬浮)
+        float mBiasConstant{0.00008f}; // 出现条纹状伪影时增大
+        float mBiasSlope{0.0008f};     // 斜面出现伪影时增大
 
         // PCF w/o Poisson
-        float mPCFRadiusTexels{1.f};
-        float mPoissonRadiusUV{0.003f};
-        uint32_t mPoissonSampleCount{16u};
+        float mPCFRadiusTexels{1.f};       // 采样半径
+        float mPoissonRadiusUV{0.003f};    // Poisson半径
+        uint32_t mPoissonSampleCount{16u}; // 采样点数
 
         // PCSS
-        float mPCSSBlockerSearchTexels{3.f};
-        float mPCSSLightSizeTexels{20.f};
-        float mPCSSMinFilterTexels{1.f};
-        float mPCSSMaxFilterTexels{24.f};
-        uint32_t mPCSSBlockerSampleCount{16u};
-        uint32_t mPCSSFilterSampleCount{24u};
+        float mPCSSBlockerSearchTexels{3.f};   // 遮挡搜索范围
+        float mPCSSLightSizeTexels{20.f};      // 光源大小
+        float mPCSSMinFilterTexels{1.f};       // 滤波半径最小值, 控制最硬也要软到什么程度
+        float mPCSSMaxFilterTexels{24.f};      // 滤波半径最大值, 限制最大模糊半径, 防止远处无限变糊
+        uint32_t mPCSSBlockerSampleCount{16u}; // 遮挡采样点数
+        uint32_t mPCSSFilterSampleCount{24u};  // 过滤采样点数
 
         // CSM
-        uint32_t mCascadeCount{1u};
-        float mCascadeBlend{0.f};
+        uint32_t mCascadeCount{4u};              // 级联数量(2/3/4)
+        float mCascadeSplitExponent{2.2f};       // 指数分割指数(>1时近处更密)
+        float mCascadeBlend{0.15f};              // 级联过渡带比例(0~1)
+        float mCascadeFarResolutionScale{0.35f}; // 最远级联相对近级联分辨率比例(0~1)
     };
 
     enum class LightType : uint8_t

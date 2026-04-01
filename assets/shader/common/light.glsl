@@ -18,7 +18,7 @@ struct DirectionalLightGPU
     vec4 direction; // xyz: direction
     vec4 colorIntensity; // rgb: color, a: intensity
     vec4 shadowParams0; // x: enabled, y: technique, z: biasConstant, w: biasSlope
-    vec4 shadowParams1; // x: pcfRadiusTexels, y: poissonRadiusUV, z: poissonSamples, w: reserved
+    vec4 shadowParams1; // x: pcfRadiusTexels, y: poissonRadiusUV, z: poissonSamples, w: cascadeSplitExponent(CSM)
     vec4 shadowParams2; // x: pcssBlockerSearchTexels, y: pcssLightSizeTexels, z: pcssMinFilterTexels, w: pcssMaxFilterTexels
     vec4 shadowParams3; // x: pcssBlockerSamples, y: pcssFilterSamples, z: cascadeCount, w: cascadeBlend
 };
@@ -176,7 +176,7 @@ float GetDirectionalShadowBias(DirectionalLightGPU light, vec3 normal, vec3 ligh
     return max(biasSlope * (1.0 - ndotl), biasConstant);
 }
 
-bool ProjectShadowCoords(vec4 fragPosLightSpace, out vec3 projCoords)
+bool ProjectShadowCoords(vec4 fragPosLightSpace, out vec3 projCoords)// 把世界点投影到 shadow map 并判断是否合法
 {
     // 齐次裁剪空间 -> NDC -> [0,1] 纹理空间
     projCoords = fragPosLightSpace.xyz / max(fragPosLightSpace.w, EPS);
@@ -319,15 +319,100 @@ float PCSSDirectional(sampler2D shadowMapSampler, vec3 projCoords, float bias, f
     return shadow / float(filterSampleCountClamped);
 }
 
-float EvaluateDirectionalShadow(sampler2D shadowMapSampler, vec4 fragPosLightSpace, vec3 normal, vec3 lightDir, DirectionalLightGPU light)
+bool ProjectShadowCoordsFromMatrix(mat4 lightVP, vec3 fragPosWS, out vec3 projCoords)
+{
+    vec4 fragPosLightSpace = lightVP * vec4(fragPosWS, 1.0);
+    return ProjectShadowCoords(fragPosLightSpace, projCoords);
+}
+
+float PCFShadowArray(sampler2DArray shadowMapArraySampler, vec3 projCoords, float bias, float radiusTexels, int cascadeLayer, float cascadeUVScale)
+{
+    float currentDepth = projCoords.z; // 当前片元在光空间的深度
+    vec2 texelSize = 1.0 / vec2(textureSize(shadowMapArraySampler, 0).xy);
+    texelSize /= max(cascadeUVScale, EPS); // 远级联使用更小有效分辨率时增大采样步长
+    float shadow = 0.0;
+    for(int x = -1; x <= 1; ++ x)
+    {
+        for(int y = -1; y <= 1; ++ y)
+        {
+            vec2 offset = vec2(float(x), float(y)) * texelSize * max(radiusTexels, 0.0);
+            float closestDepth = texture(shadowMapArraySampler, vec3(projCoords.xy + offset, float(cascadeLayer))).r;
+            shadow += (currentDepth - bias) > closestDepth ? 1.0 : 0.0;
+        }
+    }
+    return shadow / 9.0;
+}
+
+float EvaluateDirectionalShadow(sampler2D shadowMapSampler,
+    sampler2DArray shadowMapArraySampler,
+    vec4 fragPosLightSpace,
+    vec3 fragPosWS,
+    float viewDepth,
+    vec3 normal,
+    vec3 lightDir,
+    DirectionalLightGPU light,
+    uint hasDirectionalCSM,
+    uint directionalCascadeCount,
+    float directionalCascadeSplits[4],
+    float directionalCascadeUVScales[4],
+mat4 directionalLightVPArray[4])
 {
     if (!IsDirectionalShadowEnabled(light))return 0.0;
+    
+    uint technique = GetDirectionalShadowTechnique(light);
+    if (technique == SHADOW_TECHNIQUE_CSM && hasDirectionalCSM != 0u && directionalCascadeCount > 1u)
+    {
+        int cascadeLayer = int(directionalCascadeCount) - 1;
+        for(int i = 0; i < int(directionalCascadeCount); ++ i)// 根据相机深度选择cascade层
+        {
+            if (viewDepth <= directionalCascadeSplits[i])
+            {
+                cascadeLayer = i;
+                break;
+            }
+        }
+        
+        vec3 projCoords; // 投影到对应级联的shadow map坐标
+        if (!ProjectShadowCoordsFromMatrix(directionalLightVPArray[cascadeLayer], fragPosWS, projCoords))return 0.0;
+        
+        projCoords.xy *= directionalCascadeUVScales[cascadeLayer];
+        
+        float bias = GetDirectionalShadowBias(light, normal, lightDir);
+        float shadow = PCFShadowArray(shadowMapArraySampler, projCoords, bias, light.shadowParams1.x, cascadeLayer, directionalCascadeUVScales[cascadeLayer]);
+        
+        // 平滑级联过渡
+        if (cascadeLayer < int(directionalCascadeCount) - 1) // 是否存在下一个级联
+        {
+            float prevSplit = (cascadeLayer == 0) ? 0.0 : directionalCascadeSplits[cascadeLayer - 1]; // 上一个级联的分割深度
+            float splitRange = max(directionalCascadeSplits[cascadeLayer] - prevSplit, EPS); // 当前级联的深度范围
+            float blendRange = splitRange * clamp(light.shadowParams3.w, 0.0, 1.0); // 当前级联的深度长度
+            float distanceToSplit = directionalCascadeSplits[cascadeLayer] - viewDepth; // 当前片元距离当前cascade结束边界
+            
+            if (blendRange > EPS && distanceToSplit < blendRange)
+            {
+                vec3 nextProjCoords; //用下一层cascade的光矩阵重新投影
+                if (ProjectShadowCoordsFromMatrix(directionalLightVPArray[cascadeLayer + 1], fragPosWS, nextProjCoords))
+                {
+                    nextProjCoords.xy *= directionalCascadeUVScales[cascadeLayer + 1];
+                    float nextShadow = PCFShadowArray(shadowMapArraySampler,
+                        nextProjCoords,
+                        bias,
+                        light.shadowParams1.x,
+                        cascadeLayer + 1,
+                    directionalCascadeUVScales[cascadeLayer + 1]);
+                    float t = clamp(distanceToSplit / blendRange, 0.0, 1.0);
+                    shadow = mix(nextShadow, shadow, t);
+                }
+            }
+        }
+        
+        return shadow;
+    }
     
     vec3 projCoords;
     if (!ProjectShadowCoords(fragPosLightSpace, projCoords))return 0.0;
     
     float bias = GetDirectionalShadowBias(light, normal, lightDir);
-    uint technique = GetDirectionalShadowTechnique(light);
     
     if (technique == SHADOW_TECHNIQUE_HARD)return HardShadow(shadowMapSampler, projCoords, bias);
     

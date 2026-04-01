@@ -54,7 +54,6 @@ void BuildLights()
     // 初始化主方向光阴影配置
     shadowSettings.mTechnique = static_cast<core::ShadowTechnique>(shadowTechnique);
     mainLight.SetShadowSettings(shadowSettings);
-
     mainDirLightID = scene->CreateDirectionalLight(mainLight);
 
     core::PointLight pointLight; // 创建点光源
@@ -332,7 +331,7 @@ int main()
         ImGui::Text("Directional Shadow");
         ImGui::Checkbox("Shadow Enabled", &shadowSettings.mEnabled);
 
-        const char *shadowTechniqueItems[] = {"None", "Hard", "PCF", "Poisson PCF", "PCSS", "CSM (Reserved)"};
+        const char *shadowTechniqueItems[] = {"None", "Hard", "PCF", "Poisson PCF", "PCSS", "CSM"};
         if (ImGui::Combo("Shadow Technique", &shadowTechnique, shadowTechniqueItems, IM_ARRAYSIZE(shadowTechniqueItems)))
         {
             shadowSettings.mTechnique = static_cast<core::ShadowTechnique>(shadowTechnique);
@@ -376,7 +375,16 @@ int main()
         }
         else if (shadowTechnique == static_cast<int>(core::ShadowTechnique::CSM))
         {
-            ImGui::TextUnformatted("CSM shading path is reserved and not implemented yet.");
+            int cascadeCountUI = static_cast<int>(shadowSettings.mCascadeCount);
+            if (ImGui::SliderInt("Cascade Count", &cascadeCountUI, 2, 4))
+            {
+                shadowSettings.mCascadeCount = static_cast<uint32_t>(cascadeCountUI);
+            }
+
+            ImGui::SliderFloat("Split Exponent", &shadowSettings.mCascadeSplitExponent, 1.1f, 5.0f, "%.2f");
+            ImGui::SliderFloat("Cascade Blend", &shadowSettings.mCascadeBlend, 0.0f, 0.5f, "%.3f");
+            ImGui::SliderFloat("Far Resolution Scale", &shadowSettings.mCascadeFarResolutionScale, 0.2f, 1.0f, "%.2f");
+            ImGui::SliderFloat("CSM PCF Radius", &shadowSettings.mPCFRadiusTexels, 0.0f, 4.0f, "%.2f");
         }
         ImGui::End();
 

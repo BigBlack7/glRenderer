@@ -59,9 +59,16 @@ namespace core
 
         GLuint mFullscreenTriangleVAO{0}; // 全屏三角形VAO
 
-        static constexpr uint32_t DirectionalShadowTextureUnit = 15u; // 方向阴影贴图纹理单元
-        GLuint mDirectionalShadowTexture{0};                          // 方向阴影贴图的纹理句柄
-        glm::mat4 mDirectionalLightSpaceVP{1.f};                      // 方向光源的视图投影矩阵
+        static constexpr uint32_t DirectionalShadowTextureUnit = 15u;      // 单张方向阴影贴图纹理单元
+        static constexpr uint32_t DirectionalShadowArrayTextureUnit = 14u; // CSM方向阴影贴图数组纹理单元
+        GLuint mDirectionalShadowTexture{0};                               // 单张方向阴影贴图句柄
+        glm::mat4 mDirectionalLightSpaceVP{1.f};                           // 单张方向光VP矩阵
+
+        GLuint mDirectionalShadowArrayTexture{0};                                                                             // CSM深度数组纹理句柄
+        uint32_t mDirectionalCascadeCount{0};                                                                                 // CSM级联数量
+        std::array<float, 4> mDirectionalCascadeSplits{0.f, 0.f, 0.f, 0.f};                                                   // CSM级联切分深度
+        std::array<glm::mat4, 4> mDirectionalCascadeLightVPs{glm::mat4(1.f), glm::mat4(1.f), glm::mat4(1.f), glm::mat4(1.f)}; // CSM级联VP数组
+        std::array<float, 4> mDirectionalCascadeUVScales{1.f, 1.f, 1.f, 1.f};                                                 // 每级使用的有效UV比例(近大远小)
 
     private:
         /// @brief 为着色器程序绑定uniform block到指定槽位
@@ -181,6 +188,17 @@ namespace core
 
         /// @brief 清理方向光阴影图资源
         void ClearDirectionalShadow();
+
+        /// @brief 设置方向光CSM阴影图资源
+        /// @param shadowArrayTexture 阴影数组纹理
+        /// @param cascadeLightVPs 级联VP矩阵
+        /// @param cascadeSplits 级联分割深度(视空间正向距离)
+        /// @param cascadeUVScales 每级有效UV缩放(用于近远分辨率差异)
+        /// @param cascadeCount 级联数量
+        void SetDirectionalShadowCSM(GLuint shadowArrayTexture, std::span<const glm::mat4> cascadeLightVPs, std::span<const float> cascadeSplits, std::span<const float> cascadeUVScales, uint32_t cascadeCount);
+
+        /// @brief 清理方向光CSM阴影图资源
+        void ClearDirectionalShadowCSM();
 
         /// @brief 绘制全屏纹理
         /// @param shader 着色器程序

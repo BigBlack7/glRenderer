@@ -80,7 +80,7 @@ namespace core
         /// @param window 窗口指针
         /// @param xoffset 滚轮X偏移量
         /// @param yoffset 滚轮Y偏移量
-        void OnScroll(GLFWwindow *window, double xoffset, double yoffset);
+        void OnScroll([[maybe_unused]] GLFWwindow *window, [[maybe_unused]] double xoffset, double yoffset);
 
         /// @brief 设置所有输入回调函数
         /// @param app 应用程序实例

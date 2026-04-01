@@ -11,9 +11,10 @@ namespace core
     private:
         static constexpr uint32_t MaxTextureUnits = 32u; // 支持最大纹理单元数
 
-        GLuint mProgram{0};                               // 当前绑定的着色器程序(0表示无绑定)
-        GLuint mVao{0};                                   // 当前绑定的VAO(0表示无绑定)
-        std::array<GLuint, MaxTextureUnits> mTexture2D{}; // 各纹理单元的2D纹理绑定状态(0表示无绑定)
+        GLuint mProgram{0};                                    // 当前绑定的着色器程序(0表示无绑定)
+        GLuint mVao{0};                                        // 当前绑定的VAO(0表示无绑定)
+        std::array<GLuint, MaxTextureUnits> mTexture2D{};      // 各纹理单元的2D纹理绑定状态(0表示无绑定)
+        std::array<GLuint, MaxTextureUnits> mTexture2DArray{}; // 各纹理单元的2D数组纹理绑定状态(0表示无绑定)
 
     public:
         /// @brief 默认构造, 初始化所有状态为默认值(0表示未绑定任何对象)
@@ -37,5 +38,11 @@ namespace core
         /// @param textureID 2D纹理ID
         /// @return 如果实际执行了glBindTexture返回true, 如果命中缓存返回false
         bool BindTexture2D(uint32_t unit, GLuint textureID);
+
+        /// @brief 绑定2D数组纹理(带缓存检查)
+        /// @param unit 纹理单元索引(0~31)
+        /// @param textureID 2D数组纹理ID
+        /// @return 如果实际执行了glBindTexture返回true, 如果命中缓存返回false
+        bool BindTexture2DArray(uint32_t unit, GLuint textureID);
     };
 }

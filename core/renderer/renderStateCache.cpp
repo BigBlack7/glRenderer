@@ -12,6 +12,7 @@ namespace core
         mProgram = 0;
         mVao = 0;
         mTexture2D.fill(0); // 重置所有纹理单元状态
+        mTexture2DArray.fill(0);
     }
 
     bool RenderStateCache::UseProgram(GLuint program)
@@ -47,6 +48,19 @@ namespace core
 
         glBindTextureUnit(unit, textureID);
         mTexture2D[unit] = textureID; // 更新缓存状态
+        return true;
+    }
+
+    bool RenderStateCache::BindTexture2DArray(uint32_t unit, GLuint textureID)
+    {
+        if (unit >= MaxTextureUnits)
+            return false;
+
+        if (mTexture2DArray[unit] == textureID)
+            return false;
+
+        glBindTextureUnit(unit, textureID);
+        mTexture2DArray[unit] = textureID;
         return true;
     }
 }

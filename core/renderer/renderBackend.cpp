@@ -10,6 +10,7 @@
 #include <limits>
 #include <cstdint>
 #include <algorithm>
+#include <string>
 
 namespace core
 {
@@ -213,6 +214,11 @@ namespace core
         mInstanceNormalScratch.clear();
         mDirectionalShadowTexture = 0;
         mDirectionalLightSpaceVP = glm::mat4(1.f);
+        mDirectionalShadowArrayTexture = 0;
+        mDirectionalCascadeCount = 0;
+        mDirectionalCascadeSplits = {0.f, 0.f, 0.f, 0.f};
+        mDirectionalCascadeLightVPs = {glm::mat4(1.f), glm::mat4(1.f), glm::mat4(1.f), glm::mat4(1.f)};
+        mDirectionalCascadeUVScales = {1.f, 1.f, 1.f, 1.f};
 
         // 初始化默认渲染状态 - 不透明状态
         mHasAppliedState = false;
@@ -236,6 +242,11 @@ namespace core
         mInstanceNormalScratch.clear();
         mDirectionalShadowTexture = 0;
         mDirectionalLightSpaceVP = glm::mat4(1.f);
+        mDirectionalShadowArrayTexture = 0;
+        mDirectionalCascadeCount = 0;
+        mDirectionalCascadeSplits = {0.f, 0.f, 0.f, 0.f};
+        mDirectionalCascadeLightVPs = {glm::mat4(1.f), glm::mat4(1.f), glm::mat4(1.f), glm::mat4(1.f)};
+        mDirectionalCascadeUVScales = {1.f, 1.f, 1.f, 1.f};
         mInitialized = false;
         mHasAppliedState = false;
 
@@ -348,7 +359,7 @@ namespace core
                 shadow.mPCFRadiusTexels,
                 shadow.mPoissonRadiusUV,
                 static_cast<float>(std::clamp(shadow.mPoissonSampleCount, 1u, 32u)),
-                0.f);
+                std::max(shadow.mCascadeSplitExponent, 1.1f));
             lightBlock.uDirectionalLights[activeDirCount].shadowParams2 = glm::vec4(
                 shadow.mPCSSBlockerSearchTexels,
                 shadow.mPCSSLightSizeTexels,
@@ -357,8 +368,8 @@ namespace core
             lightBlock.uDirectionalLights[activeDirCount].shadowParams3 = glm::vec4(
                 static_cast<float>(std::clamp(shadow.mPCSSBlockerSampleCount, 1u, 32u)),
                 static_cast<float>(std::clamp(shadow.mPCSSFilterSampleCount, 1u, 32u)),
-                static_cast<float>(std::max(shadow.mCascadeCount, 1u)),
-                shadow.mCascadeBlend);
+                static_cast<float>(std::clamp(shadow.mCascadeCount, 2u, 4u)),
+                std::clamp(shadow.mCascadeBlend, 0.f, 1.f));
 
             dirVersions[activeDirCount] = light.GetVersion();
             ++activeDirCount;
@@ -1029,10 +1040,54 @@ namespace core
         mDirectionalLightSpaceVP = glm::mat4(1.f);
     }
 
+    void RenderBackend::SetDirectionalShadowCSM(GLuint shadowArrayTexture, std::span<const glm::mat4> cascadeLightVPs, std::span<const float> cascadeSplits, std::span<const float> cascadeUVScales, uint32_t cascadeCount)
+    {
+        mDirectionalShadowArrayTexture = shadowArrayTexture;
+        mDirectionalCascadeCount = std::min<uint32_t>(cascadeCount, 4u);
+
+        mDirectionalCascadeSplits = {0.f, 0.f, 0.f, 0.f};
+        mDirectionalCascadeLightVPs = {glm::mat4(1.f), glm::mat4(1.f), glm::mat4(1.f), glm::mat4(1.f)};
+        mDirectionalCascadeUVScales = {1.f, 1.f, 1.f, 1.f};
+
+        for (uint32_t i = 0; i < mDirectionalCascadeCount; ++i)
+        {
+            if (i < cascadeSplits.size())
+                mDirectionalCascadeSplits[i] = cascadeSplits[i];
+            if (i < cascadeLightVPs.size())
+                mDirectionalCascadeLightVPs[i] = cascadeLightVPs[i];
+            if (i < cascadeUVScales.size())
+                mDirectionalCascadeUVScales[i] = cascadeUVScales[i];
+        }
+    }
+
+    void RenderBackend::ClearDirectionalShadowCSM()
+    {
+        mDirectionalShadowArrayTexture = 0;
+        mDirectionalCascadeCount = 0;
+        mDirectionalCascadeSplits = {0.f, 0.f, 0.f, 0.f};
+        mDirectionalCascadeLightVPs = {glm::mat4(1.f), glm::mat4(1.f), glm::mat4(1.f), glm::mat4(1.f)};
+        mDirectionalCascadeUVScales = {1.f, 1.f, 1.f, 1.f};
+    }
+
     void RenderBackend::ApplyShadowGlobals(const Shader &shader, RenderProfiler &stats)
     {
+        const bool hasCSM = (mDirectionalShadowArrayTexture != 0 && mDirectionalCascadeCount > 0);
+        const bool hasAnyDirectionalShadow = (mDirectionalShadowTexture != 0) || hasCSM;
+
         shader.SetMat4Optional("uLightSpaceVP", mDirectionalLightSpaceVP);
-        shader.SetUIntOptional("uHasDirectionalShadow", mDirectionalShadowTexture != 0 ? 1u : 0u);
+        shader.SetUIntOptional("uHasDirectionalShadow", hasAnyDirectionalShadow ? 1u : 0u);
+        shader.SetUIntOptional("uHasDirectionalCSM", hasCSM ? 1u : 0u);
+        shader.SetUIntOptional("uDirectionalCascadeCount", mDirectionalCascadeCount);
+
+        for (uint32_t i = 0; i < 4u; ++i)
+        {
+            const std::string vpName = "uDirectionalLightVPArray[" + std::to_string(i) + "]";
+            const std::string splitName = "uDirectionalCascadeSplits[" + std::to_string(i) + "]";
+            const std::string scaleName = "uDirectionalCascadeUVScales[" + std::to_string(i) + "]";
+            shader.SetMat4Optional(vpName, mDirectionalCascadeLightVPs[i]);
+            shader.SetFloatOptional(splitName, mDirectionalCascadeSplits[i]);
+            shader.SetFloatOptional(scaleName, mDirectionalCascadeUVScales[i]);
+        }
 
         // 绑定方向阴影贴图纹理到着色器
         const GLint shadowMapLoc = shader.FindUniformLocation("uShadowMapSampler");
@@ -1043,6 +1098,15 @@ namespace core
             ++stats.__textureBinds__;
 
         shader.SetInt(shadowMapLoc, static_cast<int>(DirectionalShadowTextureUnit));
+
+        const GLint shadowMapArrayLoc = shader.FindUniformLocation("uShadowMapArraySampler");
+        if (shadowMapArrayLoc >= 0)
+        {
+            if (mStateCache.BindTexture2DArray(DirectionalShadowArrayTextureUnit, mDirectionalShadowArrayTexture))
+                ++stats.__textureBinds__;
+
+            shader.SetInt(shadowMapArrayLoc, static_cast<int>(DirectionalShadowArrayTextureUnit));
+        }
     }
 
     void RenderBackend::DrawFullscreenTexture(const Shader &shader, GLuint colorTexture, RenderProfiler &stats)

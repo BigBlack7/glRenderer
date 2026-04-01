@@ -14,9 +14,9 @@ namespace core
         alignas(16) glm::vec4 direction{0.f, -1.f, 0.f, 0.f};
         alignas(16) glm::vec4 colorIntensity{1.f, 1.f, 1.f, 1.f};         // xyz为颜色, w为强度
         alignas(16) glm::vec4 shadowParams0{0.f, 0.f, 0.00008f, 0.0008f}; // x=shadowEnabled(0/1), y=shadowTechnique(None/Hard/PCF/PoissonPCF/PCSS/CSM), z=biasConstant, w=biasSlope
-        alignas(16) glm::vec4 shadowParams1{1.f, 0.003f, 16.f, 0.f};      // x=pcfRadiusTexels, y=poissonRadiusUV, z=poissonSampleCount, w=reserved
+        alignas(16) glm::vec4 shadowParams1{1.f, 0.003f, 16.f, 2.2f};     // x=pcfRadiusTexels, y=poissonRadiusUV, z=poissonSampleCount, w=cascadeSplitExponent(CSM)
         alignas(16) glm::vec4 shadowParams2{3.f, 20.f, 1.f, 24.f};        // x=pcssBlockerSearchTexels, y=pcssLightSizeTexels, z=pcssMinFilterTexels, w=pcssMaxFilterTexels
-        alignas(16) glm::vec4 shadowParams3{16.f, 24.f, 1.f, 0.f};        // x=pcssBlockerSampleCount, y=pcssFilterSampleCount, z=cascadeCount(CSM预留), w=cascadeBlend(CSM预留)
+        alignas(16) glm::vec4 shadowParams3{16.f, 24.f, 4.f, 0.15f};      // x=pcssBlockerSampleCount, y=pcssFilterSampleCount, z=cascadeCount(CSM), w=cascadeBlend(CSM)
     };
 
     struct PointLightGPU final
