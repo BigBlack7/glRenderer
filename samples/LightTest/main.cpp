@@ -90,10 +90,10 @@ void ScenePrepare()
     auto albedoInfo = core::Texture::CreateInfo{.__sRGB__ = true};
 
     auto boxTex = std::make_shared<core::Texture>("bricks/bricks_albedo.jpg", 0, albedoInfo);
-    auto boxSMTex = std::make_shared<core::Texture>("bricks/bricks_normal.jpg", 1);
+    auto boxNTex = std::make_shared<core::Texture>("bricks/bricks_normal.jpg", 1);
     auto boxHeightTex = std::make_shared<core::Texture>("bricks/bricks_disp.jpg", 2);
     boxMaterial->SetTexture(core::TextureSlot::Albedo, boxTex);
-    boxMaterial->SetTexture(core::TextureSlot::MetallicRoughness, boxSMTex);
+    boxMaterial->SetTexture(core::TextureSlot::Normal, boxNTex);
     boxMaterial->SetTexture(core::TextureSlot::Height, boxHeightTex);
     auto boxState = core::MakeOpaqueState();
     boxState.mStencil.mStencilTest = true;

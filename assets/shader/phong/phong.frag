@@ -44,12 +44,23 @@ layout(std140, binding = 0)uniform FrameBlock
 // shadow
 uniform sampler2D uShadowMapSampler;
 uniform sampler2DArray uShadowMapArraySampler;
+uniform samplerCube uPointShadowCubeSampler;
+uniform sampler2D uSpotShadowMapSampler;
 uniform uint uHasDirectionalShadow = 0u;
 uniform uint uHasDirectionalCSM = 0u;
+uniform uint uHasPointShadow = 0u;
+uniform uint uHasSpotShadow = 0u;
 uniform uint uDirectionalCascadeCount = 0u;
 uniform float uDirectionalCascadeSplits[4];
 uniform float uDirectionalCascadeUVScales[4];
 uniform mat4 uDirectionalLightVPArray[4];
+uniform vec3 uPointShadowLightPos = vec3(0.0);
+uniform float uPointShadowFarPlane = 1.0;
+uniform float uPointShadowBiasConstant = 0.0008;
+uniform float uPointShadowBiasSlope = 0.002;
+uniform mat4 uSpotLightVP = mat4(1.0);
+uniform float uSpotShadowBiasConstant = 0.0008;
+uniform float uSpotShadowBiasSlope = 0.002;
 
 vec2 SteepParallaxUV(vec2 uv, vec3 V)
 {
@@ -136,8 +147,19 @@ void main()
         PointLightGPU light = uPointLights[i];
         vec3 diffuse, specular;
         GetPointLight(light, oFragPos, N, V, object_color, uShininess, specular_mask, diffuse, specular);
-        diffuse_color += diffuse;
-        specular_color += specular;
+        float shadow = 0.0;
+        if (uHasPointShadow != 0u && i == 0)
+        {
+            shadow = EvaluatePointShadow(uPointShadowCubeSampler,
+                oFragPos,
+                N,
+                uPointShadowLightPos,
+                uPointShadowFarPlane,
+                uPointShadowBiasConstant,
+            uPointShadowBiasSlope);
+        }
+        diffuse_color += diffuse * (1.0 - shadow);
+        specular_color += specular * (1.0 - shadow);
     }
     
     // spot light
@@ -147,8 +169,19 @@ void main()
         SpotLightGPU light = uSpotLights[i];
         vec3 diffuse, specular;
         GetSpotLight(light, oFragPos, N, V, object_color, uShininess, specular_mask, diffuse, specular);
-        diffuse_color += diffuse;
-        specular_color += specular;
+        float shadow = 0.0;
+        if (uHasSpotShadow != 0u && i == 0)
+        {
+            shadow = EvaluateSpotShadow(uSpotShadowMapSampler,
+                oFragPos,
+                N,
+                normalize(light.positionRange.xyz - oFragPos),
+                uSpotLightVP,
+                uSpotShadowBiasConstant,
+            uSpotShadowBiasSlope);
+        }
+        diffuse_color += diffuse * (1.0 - shadow);
+        specular_color += specular * (1.0 - shadow);
     }
     
     vec3 ambient_color = vec3(0.1) * object_color * ao_mask;

@@ -1,3 +1,4 @@
 ﻿add_subdirectory(Reflection)
 add_subdirectory(LightTest)
 add_subdirectory(Fuse)
+add_subdirectory(PointLightTest)

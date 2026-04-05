@@ -7,17 +7,24 @@
 namespace core
 {
     class DirectionalLight;
+    class PointLight;
+    class SpotLight;
     class Shader;
 
     class ShadowPass final : public IRenderPass
     {
     private:
         std::shared_ptr<Shader> mShadowShader{};
+        std::shared_ptr<Shader> mPointShadowShader{};
         GLuint mShadowFBO{0};
-        GLuint mShadowDepthTexture{0};      // 阴影贴图(单级)
-        GLuint mShadowDepthArrayTexture{0}; // CSM阴影贴图数组
+        GLuint mShadowDepthTexture{0};          // 阴影贴图(单级)
+        GLuint mShadowDepthArrayTexture{0};     // CSM阴影贴图数组
+        GLuint mPointShadowDepthCubeTexture{0}; // 点光阴影立方体深度贴图
+        GLuint mSpotShadowDepthTexture{0};      // 探照灯阴影深度贴图
         uint32_t mShadowResolution{2048u};
-        uint32_t mMaxCascadeCount{4u};      // 最大级联数量(2/3/4)
+        uint32_t mMaxCascadeCount{4u}; // 最大级联数量(2/3/4)
+        uint32_t mPointShadowResolution{1024u};
+        uint32_t mSpotShadowResolution{1024u};
         bool mInitTried{false};
 
     private:
@@ -36,6 +43,8 @@ namespace core
         /// @param ctx 帧上下文包含场景、摄像机和渲染队列等信息
         /// @return 方向光光源指针
         const DirectionalLight *SelectDirectionalLight(const FrameContext &ctx) const noexcept;
+        const PointLight *SelectPointLight(const FrameContext &ctx) const noexcept;
+        const SpotLight *SelectSpotLight(const FrameContext &ctx) const noexcept;
 
         /// @brief 聚焦阴影贴图, 动态构建阴影视图投影矩阵(只覆盖真正需要阴影的区域, 所有不透明物体 + 相机视野)
         /// @param ctx 帧上下文包含场景、摄像机和渲染队列等信息
@@ -63,6 +72,12 @@ namespace core
         /// @param cascadeCount 级联数量
         /// @return 级联UV缩放数组
         std::array<float, 4> BuildCascadeUVScales(const DirectionalLight &light, uint32_t cascadeCount) const;
+
+        /// @brief 构建点光阴影六个面的VP矩阵(+X, -X, +Y, -Y, +Z, -Z)
+        std::array<glm::mat4, 6> BuildPointLightVPs(const PointLight &light) const;
+
+        /// @brief 构建探照灯阴影VP矩阵
+        glm::mat4 BuildSpotLightVP(const SpotLight &light) const;
 
     public:
         ShadowPass() = default;

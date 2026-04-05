@@ -31,7 +31,10 @@ namespace core
 
     bool ShadowPass::EnsureInit()
     {
-        if (mShadowShader && mShadowShader->GetID() != 0 && mShadowFBO != 0 && mShadowDepthTexture != 0 && mShadowDepthArrayTexture != 0)
+        if (mShadowShader && mShadowShader->GetID() != 0 &&
+            mPointShadowShader && mPointShadowShader->GetID() != 0 &&
+            mShadowFBO != 0 && mShadowDepthTexture != 0 && mShadowDepthArrayTexture != 0 &&
+            mPointShadowDepthCubeTexture != 0 && mSpotShadowDepthTexture != 0)
             return true;
 
         if (mInitTried)
@@ -39,7 +42,8 @@ namespace core
 
         mInitTried = true;
         mShadowShader = std::make_shared<Shader>("pass/shadow.vert", "pass/shadow.frag");
-        if (!mShadowShader || mShadowShader->GetID() == 0)
+        mPointShadowShader = std::make_shared<Shader>("pass/shadowP.vert", "pass/shadowP.frag");
+        if (!mShadowShader || mShadowShader->GetID() == 0 || !mPointShadowShader || mPointShadowShader->GetID() == 0)
             return false;
 
         return EnsureShadowResources();
@@ -59,6 +63,18 @@ namespace core
             mShadowDepthArrayTexture = 0;
         }
 
+        if (mPointShadowDepthCubeTexture != 0)
+        {
+            glDeleteTextures(1, &mPointShadowDepthCubeTexture);
+            mPointShadowDepthCubeTexture = 0;
+        }
+
+        if (mSpotShadowDepthTexture != 0)
+        {
+            glDeleteTextures(1, &mSpotShadowDepthTexture);
+            mSpotShadowDepthTexture = 0;
+        }
+
         if (mShadowFBO != 0)
         {
             glDeleteFramebuffers(1, &mShadowFBO);
@@ -68,14 +84,18 @@ namespace core
 
     bool ShadowPass::EnsureShadowResources()
     {
-        if (mShadowFBO != 0 && mShadowDepthTexture != 0 && mShadowDepthArrayTexture != 0) // 检查是否已初始化
+        if (mShadowFBO != 0 && mShadowDepthTexture != 0 && mShadowDepthArrayTexture != 0 &&
+            mPointShadowDepthCubeTexture != 0 && mSpotShadowDepthTexture != 0) // 检查是否已初始化
             return true;
 
         glGenFramebuffers(1, &mShadowFBO);      // 生成阴影帧缓冲区
         glGenTextures(1, &mShadowDepthTexture); // 生成阴影深度纹理
         glGenTextures(1, &mShadowDepthArrayTexture);
+        glGenTextures(1, &mPointShadowDepthCubeTexture);
+        glGenTextures(1, &mSpotShadowDepthTexture);
 
-        if (mShadowFBO == 0 || mShadowDepthTexture == 0 || mShadowDepthArrayTexture == 0) // 检查是否生成成功
+        if (mShadowFBO == 0 || mShadowDepthTexture == 0 || mShadowDepthArrayTexture == 0 ||
+            mPointShadowDepthCubeTexture == 0 || mSpotShadowDepthTexture == 0) // 检查是否生成成功
         {
             Release();
             return false;
@@ -121,6 +141,43 @@ namespace core
         glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
         glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, borderColor);
 
+        glBindTexture(GL_TEXTURE_CUBE_MAP, mPointShadowDepthCubeTexture);
+        for (int i = 0; i < 6; ++i)
+        {
+            glTexImage2D(
+                static_cast<GLenum>(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i),
+                0,
+                GL_DEPTH_COMPONENT32F,
+                static_cast<GLsizei>(mPointShadowResolution),
+                static_cast<GLsizei>(mPointShadowResolution),
+                0,
+                GL_DEPTH_COMPONENT,
+                GL_FLOAT,
+                nullptr);
+        }
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+        glBindTexture(GL_TEXTURE_2D, mSpotShadowDepthTexture);
+        glTexImage2D(
+            GL_TEXTURE_2D,
+            0,
+            GL_DEPTH_COMPONENT32F,
+            static_cast<GLsizei>(mSpotShadowResolution),
+            static_cast<GLsizei>(mSpotShadowResolution),
+            0,
+            GL_DEPTH_COMPONENT,
+            GL_FLOAT,
+            nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
         glBindFramebuffer(GL_FRAMEBUFFER, mShadowFBO);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, mShadowDepthTexture, 0); // 将深度纹理附加到FBO的深度附件点, 渲染到FBO时深度信息会自动写入这个纹理
         glDrawBuffer(GL_NONE);                                                                              // 禁用颜色绘制缓冲区
@@ -132,7 +189,6 @@ namespace core
         return status == GL_FRAMEBUFFER_COMPLETE;
     }
 
-    // TODO 目前只支持单定向光光源阴影
     const DirectionalLight *ShadowPass::SelectDirectionalLight(const FrameContext &ctx) const noexcept
     {
         if (!ctx.__scene__)
@@ -151,6 +207,46 @@ namespace core
                 continue;
 
             return &light; // 返回第一个启用的定向光
+        }
+
+        return nullptr;
+    }
+
+    const PointLight *ShadowPass::SelectPointLight(const FrameContext &ctx) const noexcept
+    {
+        if (!ctx.__scene__)
+            return nullptr;
+
+        for (const auto &light : ctx.__scene__->GetPointLights())
+        {
+            if (!light.IsEnabled() || light.GetIntensity() <= 0.f)
+                continue;
+
+            const LightShadowSettings &shadow = light.GetShadowSettings();
+            if (!shadow.mEnabled || shadow.mTechnique == ShadowTechnique::None)
+                continue;
+
+            return &light;
+        }
+
+        return nullptr;
+    }
+
+    const SpotLight *ShadowPass::SelectSpotLight(const FrameContext &ctx) const noexcept
+    {
+        if (!ctx.__scene__)
+            return nullptr;
+
+        for (const auto &light : ctx.__scene__->GetSpotLights())
+        {
+            if (!light.IsEnabled() || light.GetIntensity() <= 0.f)
+                continue;
+
+            const LightShadowSettings &shadow = light.GetShadowSettings();
+            if (!shadow.mEnabled || shadow.mTechnique == ShadowTechnique::None)
+                continue;
+
+            return &light;
         }
 
         return nullptr;
@@ -352,8 +448,8 @@ namespace core
             const glm::vec4 centerLS4 = lightView * glm::vec4(frustumCenter, 1.f); // 将中心变换到光空间
             glm::vec2 centerLS(centerLS4.x, centerLS4.y);                          // 取 x,y 作为水平/垂直中心
             if (texelWorld > 1e-5f)
-                centerLS = glm::round(centerLS / texelWorld) * texelWorld; // 将中心坐标四舍五入到最近的 texel 网格位置
-            const glm::vec2 offsetXY = centerLS - glm::vec2(centerLS4.x, centerLS4.y); // 计算需要的偏移量以对齐到 texel
+                centerLS = glm::round(centerLS / texelWorld) * texelWorld;                    // 将中心坐标四舍五入到最近的 texel 网格位置
+            const glm::vec2 offsetXY = centerLS - glm::vec2(centerLS4.x, centerLS4.y);        // 计算需要的偏移量以对齐到 texel
             lightView = glm::translate(glm::mat4(1.f), glm::vec3(offsetXY, 0.f)) * lightView; // 将光视图平移 offset, 使投影在 shadow map 上对齐到 texel 网格来减少抖动
 
             glm::vec3 lightMin(FLT_MAX);
@@ -397,6 +493,37 @@ namespace core
         return scales; // 每级级联的 UV 缩放比例
     }
 
+    std::array<glm::mat4, 6> ShadowPass::BuildPointLightVPs(const PointLight &light) const
+    {
+        const glm::vec3 pos = light.GetPosition();
+        const float zNear = 0.1f;
+        const float zFar = std::max(light.GetRange(), zNear + 0.1f);
+        const glm::mat4 proj = glm::perspective(glm::radians(90.f), 1.f, zNear, zFar);
+
+        return {
+            proj * glm::lookAt(pos, pos + glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.f, -1.f, 0.f)),
+            proj * glm::lookAt(pos, pos + glm::vec3(-1.f, 0.f, 0.f), glm::vec3(0.f, -1.f, 0.f)),
+            proj * glm::lookAt(pos, pos + glm::vec3(0.f, 1.f, 0.f), glm::vec3(0.f, 0.f, 1.f)),
+            proj * glm::lookAt(pos, pos + glm::vec3(0.f, -1.f, 0.f), glm::vec3(0.f, 0.f, -1.f)),
+            proj * glm::lookAt(pos, pos + glm::vec3(0.f, 0.f, 1.f), glm::vec3(0.f, -1.f, 0.f)),
+            proj * glm::lookAt(pos, pos + glm::vec3(0.f, 0.f, -1.f), glm::vec3(0.f, -1.f, 0.f))};
+    }
+
+    glm::mat4 ShadowPass::BuildSpotLightVP(const SpotLight &light) const
+    {
+        const glm::vec3 pos = light.GetPosition();
+        const glm::vec3 dir = glm::normalize(light.GetDirection());
+        const float outer = glm::degrees(glm::acos(glm::clamp(light.GetOuterCos(), -1.f, 1.f)));
+        const float fov = glm::clamp(outer * 2.f, 5.f, 175.f);
+        const float zNear = 0.1f;
+        const float zFar = std::max(light.GetRange(), zNear + 0.1f);
+        const glm::vec3 up = (std::abs(glm::dot(dir, glm::vec3(0.f, 1.f, 0.f))) > 0.98f) ? glm::vec3(0.f, 0.f, 1.f) : glm::vec3(0.f, 1.f, 0.f);
+
+        const glm::mat4 view = glm::lookAt(pos, pos + dir, up);
+        const glm::mat4 proj = glm::perspective(glm::radians(fov), 1.f, zNear, zFar);
+        return proj * view;
+    }
+
     ShadowPass::~ShadowPass()
     {
         Release();
@@ -407,12 +534,10 @@ namespace core
         ctx.__shadow__ = FrameContext::ShadowFrameData{}; // 初始化阴影帧数据
         backend.ClearDirectionalShadow();
         backend.ClearDirectionalShadowCSM();
+        backend.ClearPointShadow();
+        backend.ClearSpotShadow();
 
         if (!ctx.__scene__ || !ctx.__camera__)
-            return;
-
-        const DirectionalLight *light = SelectDirectionalLight(ctx);
-        if (!light)
             return;
 
         if (!EnsureInit())
@@ -440,66 +565,126 @@ namespace core
 
         backend.ApplyPassState(shadowState);
 
-        const LightShadowSettings &shadow = light->GetShadowSettings();
-        if (shadow.mTechnique == ShadowTechnique::CSM)
+        const DirectionalLight *light = SelectDirectionalLight(ctx);
+        if (light)
         {
-            uint32_t cascadeCount = 0u;
-            const std::array<float, 4> cascadeSplits = BuildCascadeSplits(ctx, *light, cascadeCount);
-            const std::array<glm::mat4, 4> cascadeVPs = BuildCascadeLightVPs(ctx, *light, cascadeSplits, cascadeCount);
-            const std::array<float, 4> cascadeUVScales = BuildCascadeUVScales(*light, cascadeCount);
-
-            glBindFramebuffer(GL_FRAMEBUFFER, mShadowFBO);
-
-            for (uint32_t cascade = 0; cascade < cascadeCount; ++cascade)
+            const LightShadowSettings &shadow = light->GetShadowSettings();
+            if (shadow.mTechnique == ShadowTechnique::CSM)
             {
-                const float scale = std::clamp(cascadeUVScales[cascade], 0.1f, 1.f);
-                const GLsizei vpSize = static_cast<GLsizei>(std::max(64.f, static_cast<float>(mShadowResolution) * scale));
+                uint32_t cascadeCount = 0u;
+                const std::array<float, 4> cascadeSplits = BuildCascadeSplits(ctx, *light, cascadeCount);
+                const std::array<glm::mat4, 4> cascadeVPs = BuildCascadeLightVPs(ctx, *light, cascadeSplits, cascadeCount);
+                const std::array<float, 4> cascadeUVScales = BuildCascadeUVScales(*light, cascadeCount);
 
-                glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, mShadowDepthArrayTexture, 0, static_cast<GLint>(cascade));
-                glViewport(0, 0, vpSize, vpSize);
+                glBindFramebuffer(GL_FRAMEBUFFER, mShadowFBO);
+
+                for (uint32_t cascade = 0; cascade < cascadeCount; ++cascade)
+                {
+                    const float scale = std::clamp(cascadeUVScales[cascade], 0.1f, 1.f);
+                    const GLsizei vpSize = static_cast<GLsizei>(std::max(64.f, static_cast<float>(mShadowResolution) * scale));
+
+                    glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, mShadowDepthArrayTexture, 0, static_cast<GLint>(cascade));
+                    glViewport(0, 0, vpSize, vpSize);
+                    glClear(GL_DEPTH_BUFFER_BIT);
+
+                    backend.DrawShadowDepth(
+                        ctx.__renderQueue__.GetOpaqueItems(),
+                        ctx.__renderQueue__.GetOpaqueBatches(),
+                        *mShadowShader,
+                        cascadeVPs[cascade],
+                        ctx.__stats__);
+                }
+
+                backend.SetDirectionalShadowCSM(
+                    mShadowDepthArrayTexture,
+                    std::span<const glm::mat4>(cascadeVPs.data(), cascadeCount),
+                    std::span<const float>(cascadeSplits.data(), cascadeCount),
+                    std::span<const float>(cascadeUVScales.data(), cascadeCount),
+                    cascadeCount);
+
+                ctx.__shadow__.__hasDirectionalShadow__ = true;
+                ctx.__shadow__.__directionalShadowTexture__ = mShadowDepthArrayTexture;
+                ctx.__shadow__.__directionalLightVP__ = cascadeVPs[0];
+                ctx.__shadow__.__directionalShadowResolution__ = mShadowResolution;
+            }
+            else
+            {
+                const glm::mat4 lightVP = BuildDirectionalLightVP(ctx, *light);
+
+                glBindFramebuffer(GL_FRAMEBUFFER, mShadowFBO);
+                glViewport(0, 0, static_cast<GLsizei>(mShadowResolution), static_cast<GLsizei>(mShadowResolution));
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, mShadowDepthTexture, 0);
                 glClear(GL_DEPTH_BUFFER_BIT);
 
                 backend.DrawShadowDepth(
                     ctx.__renderQueue__.GetOpaqueItems(),
                     ctx.__renderQueue__.GetOpaqueBatches(),
                     *mShadowShader,
-                    cascadeVPs[cascade],
+                    lightVP,
+                    ctx.__stats__);
+
+                ctx.__shadow__.__hasDirectionalShadow__ = true;
+                ctx.__shadow__.__directionalShadowTexture__ = mShadowDepthTexture;
+                ctx.__shadow__.__directionalLightVP__ = lightVP;
+                ctx.__shadow__.__directionalShadowResolution__ = mShadowResolution;
+                backend.SetDirectionalShadow(mShadowDepthTexture, lightVP);
+            }
+        }
+
+        if (const PointLight *pointLight = SelectPointLight(ctx); pointLight)
+        {
+            const std::array<glm::mat4, 6> pointVPs = BuildPointLightVPs(*pointLight);
+            glBindFramebuffer(GL_FRAMEBUFFER, mShadowFBO);
+            glViewport(0, 0, static_cast<GLsizei>(mPointShadowResolution), static_cast<GLsizei>(mPointShadowResolution));
+            glUseProgram(mPointShadowShader->GetID());
+
+            mPointShadowShader->SetVec3Optional("uLightPos", pointLight->GetPosition());
+            mPointShadowShader->SetFloatOptional("uFarPlane", std::max(pointLight->GetRange(), 0.1f));
+
+            for (int face = 0; face < 6; ++face)
+            {
+                glFramebufferTexture2D(
+                    GL_FRAMEBUFFER,
+                    GL_DEPTH_ATTACHMENT,
+                    static_cast<GLenum>(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face),
+                    mPointShadowDepthCubeTexture,
+                    0);
+                glClear(GL_DEPTH_BUFFER_BIT);
+
+                backend.DrawShadowDepth(
+                    ctx.__renderQueue__.GetOpaqueItems(),
+                    ctx.__renderQueue__.GetOpaqueBatches(),
+                    *mPointShadowShader,
+                    pointVPs[face],
                     ctx.__stats__);
             }
 
-            backend.SetDirectionalShadowCSM(
-                mShadowDepthArrayTexture,
-                std::span<const glm::mat4>(cascadeVPs.data(), cascadeCount),
-                std::span<const float>(cascadeSplits.data(), cascadeCount),
-                std::span<const float>(cascadeUVScales.data(), cascadeCount),
-                cascadeCount);
-
-            ctx.__shadow__.__hasDirectionalShadow__ = true;
-            ctx.__shadow__.__directionalShadowTexture__ = mShadowDepthArrayTexture;
-            ctx.__shadow__.__directionalLightVP__ = cascadeVPs[0];
-            ctx.__shadow__.__directionalShadowResolution__ = mShadowResolution;
+            const LightShadowSettings &shadow = pointLight->GetShadowSettings();
+            backend.SetPointShadow(
+                mPointShadowDepthCubeTexture,
+                pointLight->GetPosition(),
+                std::max(pointLight->GetRange(), 0.1f),
+                shadow.mBiasConstant,
+                shadow.mBiasSlope);
         }
-        else
-        {
-            const glm::mat4 lightVP = BuildDirectionalLightVP(ctx, *light);
 
+        if (const SpotLight *spotLight = SelectSpotLight(ctx); spotLight)
+        {
+            const glm::mat4 spotVP = BuildSpotLightVP(*spotLight);
             glBindFramebuffer(GL_FRAMEBUFFER, mShadowFBO);
-            glViewport(0, 0, static_cast<GLsizei>(mShadowResolution), static_cast<GLsizei>(mShadowResolution));
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, mShadowDepthTexture, 0);
+            glViewport(0, 0, static_cast<GLsizei>(mSpotShadowResolution), static_cast<GLsizei>(mSpotShadowResolution));
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, mSpotShadowDepthTexture, 0);
             glClear(GL_DEPTH_BUFFER_BIT);
 
             backend.DrawShadowDepth(
                 ctx.__renderQueue__.GetOpaqueItems(),
                 ctx.__renderQueue__.GetOpaqueBatches(),
                 *mShadowShader,
-                lightVP,
+                spotVP,
                 ctx.__stats__);
 
-            ctx.__shadow__.__hasDirectionalShadow__ = true;
-            ctx.__shadow__.__directionalShadowTexture__ = mShadowDepthTexture;
-            ctx.__shadow__.__directionalLightVP__ = lightVP;
-            ctx.__shadow__.__directionalShadowResolution__ = mShadowResolution;
-            backend.SetDirectionalShadow(mShadowDepthTexture, lightVP);
+            const LightShadowSettings &shadow = spotLight->GetShadowSettings();
+            backend.SetSpotShadow(mSpotShadowDepthTexture, spotVP, shadow.mBiasConstant, shadow.mBiasSlope);
         }
 
         if (ctx.__targetWidth__ > 0u && ctx.__targetHeight__ > 0u) // 恢复视口为屏幕分辨率(准备正常渲染)

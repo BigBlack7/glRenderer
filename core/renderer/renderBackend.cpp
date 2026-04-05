@@ -219,6 +219,15 @@ namespace core
         mDirectionalCascadeSplits = {0.f, 0.f, 0.f, 0.f};
         mDirectionalCascadeLightVPs = {glm::mat4(1.f), glm::mat4(1.f), glm::mat4(1.f), glm::mat4(1.f)};
         mDirectionalCascadeUVScales = {1.f, 1.f, 1.f, 1.f};
+        mPointShadowCubeTexture = 0;
+        mPointShadowLightPos = glm::vec3(0.f);
+        mPointShadowFarPlane = 1.f;
+        mPointShadowBiasConstant = 0.0008f;
+        mPointShadowBiasSlope = 0.002f;
+        mSpotShadowTexture = 0;
+        mSpotLightSpaceVP = glm::mat4(1.f);
+        mSpotShadowBiasConstant = 0.0008f;
+        mSpotShadowBiasSlope = 0.002f;
 
         // 初始化默认渲染状态 - 不透明状态
         mHasAppliedState = false;
@@ -247,6 +256,15 @@ namespace core
         mDirectionalCascadeSplits = {0.f, 0.f, 0.f, 0.f};
         mDirectionalCascadeLightVPs = {glm::mat4(1.f), glm::mat4(1.f), glm::mat4(1.f), glm::mat4(1.f)};
         mDirectionalCascadeUVScales = {1.f, 1.f, 1.f, 1.f};
+        mPointShadowCubeTexture = 0;
+        mPointShadowLightPos = glm::vec3(0.f);
+        mPointShadowFarPlane = 1.f;
+        mPointShadowBiasConstant = 0.0008f;
+        mPointShadowBiasSlope = 0.002f;
+        mSpotShadowTexture = 0;
+        mSpotLightSpaceVP = glm::mat4(1.f);
+        mSpotShadowBiasConstant = 0.0008f;
+        mSpotShadowBiasSlope = 0.002f;
         mInitialized = false;
         mHasAppliedState = false;
 
@@ -1069,6 +1087,40 @@ namespace core
         mDirectionalCascadeUVScales = {1.f, 1.f, 1.f, 1.f};
     }
 
+    void RenderBackend::SetPointShadow(GLuint shadowCubeTexture, const glm::vec3 &lightPos, float farPlane, float biasConstant, float biasSlope)
+    {
+        mPointShadowCubeTexture = shadowCubeTexture;
+        mPointShadowLightPos = lightPos;
+        mPointShadowFarPlane = std::max(farPlane, 0.1f);
+        mPointShadowBiasConstant = std::max(biasConstant, 0.f);
+        mPointShadowBiasSlope = std::max(biasSlope, 0.f);
+    }
+
+    void RenderBackend::ClearPointShadow()
+    {
+        mPointShadowCubeTexture = 0;
+        mPointShadowLightPos = glm::vec3(0.f);
+        mPointShadowFarPlane = 1.f;
+        mPointShadowBiasConstant = 0.0008f;
+        mPointShadowBiasSlope = 0.002f;
+    }
+
+    void RenderBackend::SetSpotShadow(GLuint shadowTexture, const glm::mat4 &lightSpaceVP, float biasConstant, float biasSlope)
+    {
+        mSpotShadowTexture = shadowTexture;
+        mSpotLightSpaceVP = lightSpaceVP;
+        mSpotShadowBiasConstant = std::max(biasConstant, 0.f);
+        mSpotShadowBiasSlope = std::max(biasSlope, 0.f);
+    }
+
+    void RenderBackend::ClearSpotShadow()
+    {
+        mSpotShadowTexture = 0;
+        mSpotLightSpaceVP = glm::mat4(1.f);
+        mSpotShadowBiasConstant = 0.0008f;
+        mSpotShadowBiasSlope = 0.002f;
+    }
+
     void RenderBackend::ApplyShadowGlobals(const Shader &shader, RenderProfiler &stats)
     {
         const bool hasCSM = (mDirectionalShadowArrayTexture != 0 && mDirectionalCascadeCount > 0);
@@ -1078,6 +1130,15 @@ namespace core
         shader.SetUIntOptional("uHasDirectionalShadow", hasAnyDirectionalShadow ? 1u : 0u);
         shader.SetUIntOptional("uHasDirectionalCSM", hasCSM ? 1u : 0u);
         shader.SetUIntOptional("uDirectionalCascadeCount", mDirectionalCascadeCount);
+        shader.SetUIntOptional("uHasPointShadow", mPointShadowCubeTexture != 0 ? 1u : 0u);
+        shader.SetVec3Optional("uPointShadowLightPos", mPointShadowLightPos);
+        shader.SetFloatOptional("uPointShadowFarPlane", mPointShadowFarPlane);
+        shader.SetFloatOptional("uPointShadowBiasConstant", mPointShadowBiasConstant);
+        shader.SetFloatOptional("uPointShadowBiasSlope", mPointShadowBiasSlope);
+        shader.SetUIntOptional("uHasSpotShadow", mSpotShadowTexture != 0 ? 1u : 0u);
+        shader.SetMat4Optional("uSpotLightVP", mSpotLightSpaceVP);
+        shader.SetFloatOptional("uSpotShadowBiasConstant", mSpotShadowBiasConstant);
+        shader.SetFloatOptional("uSpotShadowBiasSlope", mSpotShadowBiasSlope);
 
         for (uint32_t i = 0; i < 4u; ++i)
         {
@@ -1106,6 +1167,24 @@ namespace core
                 ++stats.__textureBinds__;
 
             shader.SetInt(shadowMapArrayLoc, static_cast<int>(DirectionalShadowArrayTextureUnit));
+        }
+
+        const GLint pointShadowCubeLoc = shader.FindUniformLocation("uPointShadowCubeSampler");
+        if (pointShadowCubeLoc >= 0)
+        {
+            if (mStateCache.BindTextureCube(PointShadowCubeTextureUnit, mPointShadowCubeTexture))
+                ++stats.__textureBinds__;
+
+            shader.SetInt(pointShadowCubeLoc, static_cast<int>(PointShadowCubeTextureUnit));
+        }
+
+        const GLint spotShadowMapLoc = shader.FindUniformLocation("uSpotShadowMapSampler");
+        if (spotShadowMapLoc >= 0)
+        {
+            if (mStateCache.BindTexture2D(SpotShadowTextureUnit, mSpotShadowTexture))
+                ++stats.__textureBinds__;
+
+            shader.SetInt(spotShadowMapLoc, static_cast<int>(SpotShadowTextureUnit));
         }
     }
 

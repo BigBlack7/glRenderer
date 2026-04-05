@@ -364,11 +364,13 @@ namespace core
             }
 
             // 加载高度/位移贴图
+            // 注意: aiTextureType_HEIGHT 在很多OBJ/MTL中通常表示 legacy bump map, 直接用于视差会造成纹理随视角滑动。
+            // 这里仅接受 DISPLACEMENT 作为真实高度源, 以避免错误的视差UV偏移。
             if (auto heightMap = LoadTextureWithCache(
                     aiMaterial,
                     aiSceneRef,
                     modelDir,
-                    {aiTextureType_DISPLACEMENT, aiTextureType_HEIGHT},
+                    {aiTextureType_DISPLACEMENT},
                     options.__flipTextureY__,
                     false,
                     textureCache))
@@ -376,6 +378,9 @@ namespace core
                 GL_INFO("[ModelLoader] '{}' - Height Map Texture Loaded Successfully", modelName);
                 material->SetTexture(TextureSlot::Height, std::move(heightMap));
             }
+
+            if (HasAnyTexture(aiMaterial, {aiTextureType_HEIGHT}))
+                GL_DEBUG("[ModelLoader] '{}' - HEIGHT/Bump Texture Detected But Ignored For Parallax Stability", modelName);
 
             // TODO: AO通道接入后开启
             if (HasAnyTexture(aiMaterial, {aiTextureType_AMBIENT_OCCLUSION, aiTextureType_LIGHTMAP}))

@@ -1,4 +1,2 @@
 ﻿.vscode/
 build/
-core/renderer/todo/
-core/renderer/renderResource.hpp

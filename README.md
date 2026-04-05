@@ -51,11 +51,8 @@
   - Interface: `Render(const Scene&, const Camera&)`
 - ✅ `Assimp Model Loader`
 - ✅ `Shadow Mapping`
-- ⬜ `Disney PBR`
-- ⬜ `NPR`
-- ⬜ `IBL`
+- ⬜ `PBR + IBL`
 - ✅ `Post Process`
-- ⬜ `Deferred Rendering Pipeline`
 - ⬜ `IMGUI Editor`
 
 ## Module Graph

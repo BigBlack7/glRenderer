@@ -172,7 +172,7 @@ namespace core
         UpdateCameraBasisFromYawPitch();
     }
 
-    void CameraController::OnMouseButton(GLFWwindow *window, int button, int action, int mods)
+    void CameraController::OnMouseButton([[maybe_unused]] GLFWwindow *window, [[maybe_unused]] int button, [[maybe_unused]] int action, [[maybe_unused]] int mods)
     {
         ImGuiIO &io = ImGui::GetIO();
         if (io.WantCaptureMouse)
@@ -184,7 +184,7 @@ namespace core
         }
     }
 
-    void CameraController::OnScroll(GLFWwindow *window, double xoffset, double yoffset)
+    void CameraController::OnScroll([[maybe_unused]] GLFWwindow *window, [[maybe_unused]] double xoffset, double yoffset)
     {
         ImGuiIO &io = ImGui::GetIO();
         if (io.WantCaptureMouse)

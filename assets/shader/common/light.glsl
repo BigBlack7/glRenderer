@@ -381,7 +381,7 @@ mat4 directionalLightVPArray[4])
         float shadow = PCFShadowArray(shadowMapArraySampler, projCoords, bias, light.shadowParams1.x, cascadeLayer, directionalCascadeUVScales[cascadeLayer]);
         
         // 平滑级联过渡
-        if (cascadeLayer < int(directionalCascadeCount) - 1) // 是否存在下一个级联
+        if (cascadeLayer < int(directionalCascadeCount) - 1)// 是否存在下一个级联
         {
             float prevSplit = (cascadeLayer == 0) ? 0.0 : directionalCascadeSplits[cascadeLayer - 1]; // 上一个级联的分割深度
             float splitRange = max(directionalCascadeSplits[cascadeLayer] - prevSplit, EPS); // 当前级联的深度范围
@@ -426,4 +426,52 @@ mat4 directionalLightVPArray[4])
     }
     
     return 0.0;
+}
+
+float GetPointShadowBias(vec3 normal, vec3 lightDir, float biasConstant, float biasSlope)
+{
+    float ndotl = max(dot(normalize(normal), normalize(lightDir)), 0.0);
+    return max(max(biasSlope, 0.0) * (1.0 - ndotl), max(biasConstant, 0.0));
+}
+
+float EvaluatePointShadow(samplerCube pointShadowCubeSampler,
+    vec3 fragPosWS,
+    vec3 normal,
+    vec3 lightPos,
+    float farPlane,
+    float biasConstant,
+float biasSlope)
+{
+    vec3 fragToLight = fragPosWS - lightPos;
+    float currentDepth = length(fragToLight);
+    if (currentDepth <= EPS || farPlane <= EPS)return 0.0;
+    
+    vec3 lightDir = normalize(lightPos - fragPosWS);
+    float bias = GetPointShadowBias(normal, lightDir, biasConstant, biasSlope);
+    
+    // shadowP.frag写入的是 length / (1.414 * farPlane)
+    float currentDepthNormalized = max(currentDepth - bias, 0.0) / (1.414 * farPlane);
+    float closestDepthNormalized = texture(pointShadowCubeSampler, normalize(fragToLight)).r;
+    
+    return currentDepthNormalized > closestDepthNormalized ? 1.0 : 0.0;
+}
+
+float GetSpotShadowBias(vec3 normal, vec3 lightDir, float biasConstant, float biasSlope)
+{
+    float ndotl = max(dot(normalize(normal), normalize(lightDir)), 0.0);
+    return max(max(biasSlope, 0.0) * (1.0 - ndotl), max(biasConstant, 0.0));
+}
+
+float EvaluateSpotShadow(sampler2D spotShadowMapSampler,
+    vec3 fragPosWS,
+    vec3 normal,
+    vec3 lightDir,
+    mat4 spotLightVP,
+    float biasConstant,
+float biasSlope)
+{
+    vec3 projCoords;
+    if (!ProjectShadowCoordsFromMatrix(spotLightVP, fragPosWS, projCoords))return 0.0;
+    float bias = GetSpotShadowBias(normal, lightDir, biasConstant, biasSlope);
+    return PCFShadow(spotShadowMapSampler, projCoords, bias, 1.0);
 }

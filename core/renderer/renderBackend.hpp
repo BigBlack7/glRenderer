@@ -61,6 +61,8 @@ namespace core
 
         static constexpr uint32_t DirectionalShadowTextureUnit = 15u;      // 单张方向阴影贴图纹理单元
         static constexpr uint32_t DirectionalShadowArrayTextureUnit = 14u; // CSM方向阴影贴图数组纹理单元
+        static constexpr uint32_t PointShadowCubeTextureUnit = 13u;        // 点光阴影立方体贴图纹理单元
+        static constexpr uint32_t SpotShadowTextureUnit = 12u;             // 聚光阴影贴图纹理单元
         GLuint mDirectionalShadowTexture{0};                               // 单张方向阴影贴图句柄
         glm::mat4 mDirectionalLightSpaceVP{1.f};                           // 单张方向光VP矩阵
 
@@ -69,6 +71,17 @@ namespace core
         std::array<float, 4> mDirectionalCascadeSplits{0.f, 0.f, 0.f, 0.f};                                                   // CSM级联切分深度
         std::array<glm::mat4, 4> mDirectionalCascadeLightVPs{glm::mat4(1.f), glm::mat4(1.f), glm::mat4(1.f), glm::mat4(1.f)}; // CSM级联VP数组
         std::array<float, 4> mDirectionalCascadeUVScales{1.f, 1.f, 1.f, 1.f};                                                 // 每级使用的有效UV比例(近大远小)
+
+        GLuint mPointShadowCubeTexture{0};       // 点光阴影立方体深度贴图
+        glm::vec3 mPointShadowLightPos{0.f};     // 点光阴影光源位置
+        float mPointShadowFarPlane{1.f};         // 点光阴影far
+        float mPointShadowBiasConstant{0.0008f}; // 点光阴影常量偏移
+        float mPointShadowBiasSlope{0.002f};     // 点光阴影坡度偏移
+
+        GLuint mSpotShadowTexture{0};           // 聚光阴影深度贴图
+        glm::mat4 mSpotLightSpaceVP{1.f};       // 聚光阴影视图投影矩阵
+        float mSpotShadowBiasConstant{0.0008f}; // 聚光阴影常量偏移
+        float mSpotShadowBiasSlope{0.002f};     // 聚光阴影坡度偏移
 
     private:
         /// @brief 为着色器程序绑定uniform block到指定槽位
@@ -199,6 +212,27 @@ namespace core
 
         /// @brief 清理方向光CSM阴影图资源
         void ClearDirectionalShadowCSM();
+
+        /// @brief 设置点光阴影图资源
+        /// @param shadowCubeTexture 阴影立方体纹理
+        /// @param lightPos 光源位置
+        /// @param farPlane 远平面
+        /// @param biasConstant 常量偏移
+        /// @param biasSlope 坡度偏移
+        void SetPointShadow(GLuint shadowCubeTexture, const glm::vec3 &lightPos, float farPlane, float biasConstant, float biasSlope);
+
+        /// @brief 清理点光阴影图资源
+        void ClearPointShadow();
+
+        /// @brief 设置聚光阴影图资源
+        /// @param shadowTexture 阴影深度纹理
+        /// @param lightSpaceVP 光空间VP矩阵
+        /// @param biasConstant 常量偏移
+        /// @param biasSlope 坡度偏移
+        void SetSpotShadow(GLuint shadowTexture, const glm::mat4 &lightSpaceVP, float biasConstant, float biasSlope);
+
+        /// @brief 清理聚光阴影图资源
+        void ClearSpotShadow();
 
         /// @brief 绘制全屏纹理
         /// @param shader 着色器程序
