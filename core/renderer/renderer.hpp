@@ -3,6 +3,7 @@
 #include "renderBackend.hpp"
 #include "rendergraph.hpp"
 #include "buffer/frameBuffer.hpp"
+#include "pass/postProcessPass.hpp"
 #include "utils/profiler.hpp"
 #include "scene/scene.hpp"
 #include <glm/glm.hpp>
@@ -22,6 +23,7 @@ namespace core
         FrameBuffer mSceneColorTarget{};
         uint32_t mTargetWidth{0};
         uint32_t mTargetHeight{0};
+        PostProcessSettings mPostProcessSettings{};
 
     private:
         /// @brief 确保渲染器已初始化
@@ -50,6 +52,14 @@ namespace core
                 mBackend.SetClearColor(mClearColor); // 实时更新
             }
         }
+
+        void SetPostProcessSettings(const PostProcessSettings &settings)
+        {
+            mPostProcessSettings = settings;
+            PostProcessPass::SetGlobalSettings(mPostProcessSettings);
+        }
+
+        const PostProcessSettings &GetPostProcessSettings() const noexcept { return mPostProcessSettings; }
 
         const RenderProfiler &GetStats() const noexcept { return mInfos; }
 

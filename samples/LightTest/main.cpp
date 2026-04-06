@@ -44,6 +44,8 @@ bool skyboxEnabled = true;
 int skyboxSource = 0; // 0: cubemap, 1: panorama
 float skyboxIntensity = 1.f;
 
+core::PostProcessSettings postSettings{};
+
 void BuildLights()
 {
     core::DirectionalLight mainLight; // 创建定向光
@@ -386,6 +388,15 @@ int main()
             ImGui::SliderFloat("Far Resolution Scale", &shadowSettings.mCascadeFarResolutionScale, 0.2f, 1.0f, "%.2f");
             ImGui::SliderFloat("CSM PCF Radius", &shadowSettings.mPCFRadiusTexels, 0.0f, 4.0f, "%.2f");
         }
+
+        ImGui::Separator();
+        ImGui::Text("Post Process");
+        ImGui::Checkbox("Gamma Enabled", &postSettings.mGammaEnabled);
+        ImGui::SliderFloat("Gamma", &postSettings.mGamma, 1.0f, 3.0f, "%.2f");
+        ImGui::SliderFloat("Exposure", &postSettings.mExposure, 0.0f, 3.0f, "%.2f");
+        ImGui::SliderFloat("Saturation", &postSettings.mSaturation, 0.0f, 2.0f, "%.2f");
+        ImGui::SliderFloat("Contrast", &postSettings.mContrast, 0.0f, 2.0f, "%.2f");
+        ImGui::SliderFloat("Vignette", &postSettings.mVignette, 0.0f, 1.0f, "%.2f");
         ImGui::End();
 
         if (auto *box = scene->GetEntity(boxID))
@@ -424,6 +435,8 @@ int main()
         {
             mainLight->SetShadowSettings(shadowSettings);
         }
+
+        renderer->SetPostProcessSettings(postSettings);
 
         renderer->SetClearColor(clearColor);
         renderer->Render(*scene, *camera, static_cast<float>(glfwGetTime()));

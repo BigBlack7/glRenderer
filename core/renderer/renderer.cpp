@@ -11,6 +11,11 @@
 
 namespace core
 {
+    namespace detail
+    {
+        constexpr uint32_t SceneMSAASamples = 4u;
+    }
+
     bool Renderer::EnsureInit()
     {
         if (!mInitialized)
@@ -28,7 +33,7 @@ namespace core
 
         if (!mSceneColorTarget.IsValid()) // 场景颜色目标不存在
         {
-            if (!mSceneColorTarget.Create(width, height, true)) // 创建场景颜色目标失败
+            if (!mSceneColorTarget.Create(width, height, true, detail::SceneMSAASamples)) // 创建场景颜色目标失败
             {
                 GL_CRITICAL("[Renderer] Failed To Create Scene Color Target: {}x{}", width, height);
                 return false;
@@ -67,6 +72,7 @@ namespace core
         mGraph.AddPass(std::make_unique<ForwardTransparentPass>());
         mGraph.AddPass(std::make_unique<LightProxyPass>());
         mGraph.AddPass(std::make_unique<PostProcessPass>());
+        PostProcessPass::SetGlobalSettings(mPostProcessSettings);
 
         if (!mGraph.Compile())
         {
@@ -109,6 +115,7 @@ namespace core
         context.__renderQueue__.Build(scene, camera);
 
         mBackend.SetClearColor(mClearColor);
+        PostProcessPass::SetGlobalSettings(mPostProcessSettings);
 
         mGraph.Execute(context, mBackend);
         mInfos = context.__stats__;
