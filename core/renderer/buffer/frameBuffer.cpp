@@ -109,12 +109,12 @@ namespace core
         glTexImage2D(
             GL_TEXTURE_2D,
             0,
-            GL_RGBA8, // 内部格式: 8位RGBA
+            GL_RGBA16F, // HDR颜色缓冲
             static_cast<GLsizei>(width),
             static_cast<GLsizei>(height),
             0,
             GL_RGBA, // 像素格式: RGBA
-            GL_UNSIGNED_BYTE,
+            GL_FLOAT,
             nullptr);
 
         // 设置纹理参数
@@ -132,7 +132,7 @@ namespace core
             glRenderbufferStorageMultisample(
                 GL_RENDERBUFFER,
                 static_cast<GLsizei>(mSamples),
-                GL_RGBA8,
+                GL_RGBA16F,
                 static_cast<GLsizei>(width),
                 static_cast<GLsizei>(height));
             glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, mColorMSAARBO);

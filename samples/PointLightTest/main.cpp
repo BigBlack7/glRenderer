@@ -47,6 +47,8 @@ bool skyboxEnabled = true;
 int skyboxSource = 0; // 0: cubemap, 1: panorama
 float skyboxIntensity = 1.f;
 
+core::PostProcessSettings postSettings{};
+
 void BuildLights()
 {
     core::PointLight pointLight; // 创建点光源
@@ -355,7 +357,7 @@ int main()
         ImGui::Combo("Light Mode", &activeLightMode, lightModes, IM_ARRAYSIZE(lightModes));
         ImGui::ColorEdit3("Light Color", glm::value_ptr(lightColor));
         ImGui::SliderFloat3("Light Position", glm::value_ptr(lightPosition), -4.5f, 4.5f);
-        ImGui::SliderFloat("Light Intensity", &lightIntensity, 0.f, 8.f);
+        ImGui::SliderFloat("Light Intensity", &lightIntensity, 0.f, 100.f);
         ImGui::SliderFloat("Light Range", &lightRange, 2.f, 40.f);
         if (activeLightMode == 1)
         {
@@ -365,6 +367,29 @@ int main()
             if (spotOuterAngleDeg < spotInnerAngleDeg + 1.f)
                 spotOuterAngleDeg = spotInnerAngleDeg + 1.f;
         }
+
+        ImGui::Separator();
+        ImGui::Text("Post Process (HDR)");
+        int toneMapModeUI = static_cast<int>(postSettings.mToneMapMode);
+        const char *toneMapItems[] = {"Reinhard", "Exposure"};
+        if (ImGui::Combo("Tone Mapping", &toneMapModeUI, toneMapItems, IM_ARRAYSIZE(toneMapItems)))
+            postSettings.mToneMapMode = static_cast<core::ToneMapMode>(toneMapModeUI);
+
+        if (postSettings.mToneMapMode == core::ToneMapMode::Exposure)
+            ImGui::SliderFloat("Exposure", &postSettings.mExposure, 0.01f, 10.f, "%.2f", ImGuiSliderFlags_Logarithmic);
+
+        ImGui::Checkbox("Gamma Enabled", &postSettings.mGammaEnabled);
+        ImGui::SliderFloat("Gamma", &postSettings.mGamma, 1.0f, 3.0f, "%.2f");
+
+        ImGui::Separator();
+        ImGui::Text("Bloom");
+        ImGui::Checkbox("Bloom Enabled", &postSettings.mBloomEnabled);
+        ImGui::SliderFloat("Bloom Intensity", &postSettings.mBloomIntensity, 0.0f, 2.0f, "%.3f");
+        ImGui::SliderFloat("Bloom Threshold", &postSettings.mBloomThreshold, 0.1f, 10.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
+        ImGui::SliderFloat("Bloom Knee", &postSettings.mBloomKnee, 0.01f, 2.0f, "%.2f");
+        int bloomIterUI = static_cast<int>(postSettings.mBloomIterations);
+        if (ImGui::SliderInt("Bloom Iterations", &bloomIterUI, 1, 16))
+            postSettings.mBloomIterations = static_cast<uint32_t>(bloomIterUI);
         ImGui::End();
 
         if (skyboxSource == 0)
@@ -385,6 +410,7 @@ int main()
         scene->SetSkyboxEnabled(skyboxEnabled);
         scene->SetSkyboxIntensity(skyboxIntensity);
         SyncActiveLightSettings();
+        renderer->SetPostProcessSettings(postSettings);
 
         renderer->SetClearColor(clearColor);
         renderer->Render(*scene, *camera, static_cast<float>(glfwGetTime()));

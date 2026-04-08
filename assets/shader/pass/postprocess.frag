@@ -4,19 +4,33 @@ in vec2 oUV;
 out vec4 oPixelColor;
 
 uniform sampler2D uSceneSampler;
+uniform sampler2D uBloomSampler;
 uniform uint uGammaEnabled = 1u;
+uniform uint uToneMapMode = 1u; // 0: Reinhard, 1: Exposure
+uniform uint uBloomEnabled = 1u;
+uniform float uBloomIntensity = 0.08;
 uniform float uGamma = 2.2;
 uniform float uExposure = 1.0;
 uniform float uSaturation = 1.0;
 uniform float uContrast = 1.0;
 uniform float uVignette = 0.0;
 
+vec3 ToneMapReinhard(vec3 hdr)
+{
+    return hdr / (hdr + vec3(1.0));
+}
+
+vec3 ToneMapExposure(vec3 hdr, float exposure)
+{
+    return vec3(1.0) - exp(-hdr * max(exposure, 0.0));
+}
+
 void main()
 {
-    vec3 color = texture(uSceneSampler, oUV).rgb;
+    vec3 hdrColor = max(texture(uSceneSampler, oUV).rgb, vec3(0.0));
+    if (uBloomEnabled != 0u) hdrColor += max(texture(uBloomSampler, oUV).rgb, vec3(0.0)) * max(uBloomIntensity, 0.0);
     
-    // Exposure
-    color *= max(uExposure, 0.0);
+    vec3 color = (uToneMapMode == 0u) ? ToneMapReinhard(hdrColor) : ToneMapExposure(hdrColor, uExposure);
     
     // Saturation
     float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
