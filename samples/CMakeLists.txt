@@ -2,3 +2,4 @@
 add_subdirectory(LightTest)
 add_subdirectory(Fuse)
 add_subdirectory(PointLightTest)
+add_subdirectory(PBR)

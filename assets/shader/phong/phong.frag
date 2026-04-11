@@ -40,6 +40,8 @@ layout(std140, binding = 0)uniform FrameBlock
 };
 
 #include "../common/light.glsl"
+#include "../common/phong.glsl"
+#include "../common/shadow.glsl"
 
 // shadow
 uniform sampler2D uShadowMapSampler;

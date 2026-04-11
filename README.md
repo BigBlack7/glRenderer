@@ -1,7 +1,7 @@
 ﻿# GLRenderer
 
 - Build it by MSVC with C++20.
-- Refer to LearOpenGL, Godot, EnTT and So on.
+- Refer to LearOpenGL, Godot, Unity and So on.
 
 # NameFormat
 
@@ -16,7 +16,7 @@
 
 # Architecture Design
 
-> Disclaimer: 小孩子👶不懂事做着玩的😋.
+> Disclaimer: 👶小孩子不懂事做着玩的😋.
 
 ## Core Features
 
