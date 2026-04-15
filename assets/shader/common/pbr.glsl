@@ -20,7 +20,15 @@ float G(float NdotV, float NdotL, float alpha)// GGX geometry function for both 
 
 vec3 FresnelSchlick(float cosTheta, vec3 F0)
 {
-    return F0 + (vec3(1.0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+    // return F0 + (vec3(1.0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+    float f = pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+    return f + F0 * (1.0 - f);
+}
+
+vec3 FresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
+{
+    float f = pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+    return f + F0 * (1.0 - f) * (1.0 - roughness);
 }
 
 vec3 EvaluateBRDF(vec3 N, vec3 V, vec3 L, vec3 radiance, vec3 albedo, float metallic, float roughness)

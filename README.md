@@ -51,9 +51,8 @@
   - Interface: `Render(const Scene&, const Camera&)`
 - ✅ `Assimp Model Loader`
 - ✅ `Shadow Mapping`
-- ⬜ `PBR + IBL`
+- ✅ `PBR + IBL`
 - ✅ `Post Process`
-- ⬜ `IMGUI Editor`
 
 ## Module Graph
 

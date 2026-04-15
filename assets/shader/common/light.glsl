@@ -10,7 +10,7 @@
 #define MAX_SPOT_LIGHTS 8
 #endif
 
-const float EPS = 0.000001;
+const float EPS = 1e-5;
 const float specularIntensity = 0.3;
 const float PI = 3.14159265359;
 

@@ -39,8 +39,9 @@ core::LightShadowSettings dirShadowSettings{};
 std::shared_ptr<core::EnvironmentMap> skyboxCube = nullptr;
 std::shared_ptr<core::EnvironmentMap> skyboxPanorama = nullptr;
 bool skyboxEnabled = true;
-int skyboxSource = 0; // 0: cubemap, 1: panorama
+int skyboxSource = 0; // 0: garden.exr, 1: room.exr
 float skyboxIntensity = 1.f;
+int shadowTechnique = static_cast<int>(core::ShadowTechnique::PoissonPCF);
 
 core::PostProcessSettings postSettings{};
 
@@ -63,7 +64,7 @@ void BuildLights()
     dirLight.SetIntensity(dirLightIntensity);
 
     dirShadowSettings.mEnabled = true;
-    dirShadowSettings.mTechnique = core::ShadowTechnique::PoissonPCF;
+    dirShadowSettings.mTechnique = static_cast<core::ShadowTechnique>(shadowTechnique);
     // Reduce self-shadow acne on smooth curved surfaces.
     dirShadowSettings.mBiasConstant = 0.0025f;
     dirShadowSettings.mBiasSlope = 0.01f;
@@ -97,19 +98,21 @@ void ScenePrepare()
         sphereEntity->GetTransform().SetPosition(spherePos);
     }
 
-    auto groundMaterial = std::make_shared<core::Material>(phongShader);
     auto albedoInfo = core::Texture::CreateInfo{.__sRGB__ = true};
-    auto groundTex = std::make_shared<core::Texture>("grass/grass.jpg", 0, albedoInfo);
-    groundMaterial->SetTexture(core::TextureSlot::Albedo, groundTex);
-    groundMaterial->SetRenderState(core::MakeOpaqueState());
-
-    groundID = scene->CreateEntity("PhongGround");
-    if (auto *ground = scene->GetEntity(groundID))
+    auto tileTex = std::make_shared<core::Texture>("tile/slab_tiles_diff_2k.jpg", 0, albedoInfo);
+    auto tileNTex = std::make_shared<core::Texture>("tile/slab_tiles_nor_gl_2k.jpg", 1);
+    auto tileARMTex = std::make_shared<core::Texture>("tile/slab_tiles_arm_2k.jpg", 2);
+    auto tileMaterial = std::make_shared<core::Material>(pbrShader);
+    tileMaterial->SetTexture(core::TextureSlot::Albedo, tileTex);
+    tileMaterial->SetTexture(core::TextureSlot::Normal, tileNTex);
+    tileMaterial->SetTexture(core::TextureSlot::MetallicRoughness, tileARMTex);
+    auto tileID = scene->CreateEntity("Tile");
+    if (auto *tileEntity = scene->GetEntity(tileID))
     {
-        ground->SetMesh(planeMesh);
-        ground->SetMaterial(groundMaterial);
-        ground->GetTransform().SetPosition(glm::vec3(0.f, -2.f, 0.f));
-        ground->GetTransform().SetEulerXyzDeg(glm::vec3(-90.f, 0.f, 0.f));
+        tileEntity->SetMesh(planeMesh);
+        tileEntity->SetMaterial(tileMaterial);
+        tileEntity->GetTransform().SetPosition(glm::vec3{0.f, -2.f, 0.f});
+        tileEntity->GetTransform().SetEulerXyzDeg(glm::vec3(-90.f, 0.f, 0.f));
     }
 
     core::ModelLoadOptions objOpt{};
@@ -156,17 +159,8 @@ void ScenePrepare()
         }
     }
 
-    skyboxCube = std::make_shared<core::EnvironmentMap>(
-        std::array<std::filesystem::path, 6>{
-            "skybox/lake/right.jpg",  // +X
-            "skybox/lake/left.jpg",   // -X
-            "skybox/lake/top.jpg",    // +Y
-            "skybox/lake/bottom.jpg", // -Y
-            "skybox/lake/back.jpg",   // +Z
-            "skybox/lake/front.jpg"   // -Z
-        });
-
-    skyboxPanorama = std::make_shared<core::EnvironmentMap>("skybox/dream.jpg");
+    skyboxCube = std::make_shared<core::EnvironmentMap>("grasslands.exr");
+    skyboxPanorama = std::make_shared<core::EnvironmentMap>("room.exr");
 
     if (skyboxCube && skyboxCube->IsValid())
     {
@@ -264,7 +258,7 @@ int main()
         ImGui::Checkbox("Skybox Enabled", &skyboxEnabled);
         ImGui::SliderFloat("Skybox Intensity", &skyboxIntensity, 0.f, 4.f);
 
-        const char *skyboxItems[] = {"Cubemap (6 Faces)", "Panorama (1 Image)"};
+        const char *skyboxItems[] = {"grasslands.exr", "room.exr"};
         ImGui::Combo("Skybox Source", &skyboxSource, skyboxItems, IM_ARRAYSIZE(skyboxItems));
 
         ImGui::Separator();
@@ -272,8 +266,54 @@ int main()
         ImGui::ColorEdit3("Light Color", glm::value_ptr(dirLightColor));
         ImGui::SliderFloat3("Light Direction", glm::value_ptr(dirLightDirection), -1.f, 1.f);
         ImGui::SliderFloat("Light Intensity", &dirLightIntensity, 0.f, 4.f);
+
+        ImGui::Separator();
+        ImGui::Text("Directional Shadow");
+        ImGui::Checkbox("Shadow Enabled", &dirShadowSettings.mEnabled);
+        const char *shadowTechniqueItems[] = {"None", "Hard", "PCF", "Poisson PCF", "PCSS", "CSM"};
+        if (ImGui::Combo("Shadow Technique", &shadowTechnique, shadowTechniqueItems, IM_ARRAYSIZE(shadowTechniqueItems)))
+            dirShadowSettings.mTechnique = static_cast<core::ShadowTechnique>(shadowTechnique);
+
         ImGui::SliderFloat("Shadow Bias Constant", &dirShadowSettings.mBiasConstant, 0.0002f, 0.01f, "%.6f", ImGuiSliderFlags_Logarithmic);
         ImGui::SliderFloat("Shadow Bias Slope", &dirShadowSettings.mBiasSlope, 0.0005f, 0.04f, "%.6f", ImGuiSliderFlags_Logarithmic);
+
+        if (shadowTechnique == static_cast<int>(core::ShadowTechnique::PCF))
+        {
+            ImGui::SliderFloat("PCF Radius Texels", &dirShadowSettings.mPCFRadiusTexels, 0.0f, 4.0f, "%.2f");
+        }
+        else if (shadowTechnique == static_cast<int>(core::ShadowTechnique::PoissonPCF))
+        {
+            ImGui::SliderFloat("Poisson Radius UV", &dirShadowSettings.mPoissonRadiusUV, 0.0001f, 0.02f, "%.5f", ImGuiSliderFlags_Logarithmic);
+            int poissonSamplesUI = static_cast<int>(dirShadowSettings.mPoissonSampleCount);
+            if (ImGui::SliderInt("Poisson Samples", &poissonSamplesUI, 1, 32))
+                dirShadowSettings.mPoissonSampleCount = static_cast<uint32_t>(poissonSamplesUI);
+        }
+        else if (shadowTechnique == static_cast<int>(core::ShadowTechnique::PCSS))
+        {
+            ImGui::SliderFloat("Blocker Search Texels", &dirShadowSettings.mPCSSBlockerSearchTexels, 0.5f, 12.0f, "%.2f");
+            ImGui::SliderFloat("Light Size Texels", &dirShadowSettings.mPCSSLightSizeTexels, 1.0f, 64.0f, "%.2f");
+            ImGui::SliderFloat("Min Filter Texels", &dirShadowSettings.mPCSSMinFilterTexels, 0.0f, 8.0f, "%.2f");
+            ImGui::SliderFloat("Max Filter Texels", &dirShadowSettings.mPCSSMaxFilterTexels, 1.0f, 96.0f, "%.2f");
+
+            int blockerSamplesUI = static_cast<int>(dirShadowSettings.mPCSSBlockerSampleCount);
+            if (ImGui::SliderInt("Blocker Samples", &blockerSamplesUI, 1, 32))
+                dirShadowSettings.mPCSSBlockerSampleCount = static_cast<uint32_t>(blockerSamplesUI);
+
+            int filterSamplesUI = static_cast<int>(dirShadowSettings.mPCSSFilterSampleCount);
+            if (ImGui::SliderInt("Filter Samples", &filterSamplesUI, 1, 32))
+                dirShadowSettings.mPCSSFilterSampleCount = static_cast<uint32_t>(filterSamplesUI);
+        }
+        else if (shadowTechnique == static_cast<int>(core::ShadowTechnique::CSM))
+        {
+            int cascadeCountUI = static_cast<int>(dirShadowSettings.mCascadeCount);
+            if (ImGui::SliderInt("Cascade Count", &cascadeCountUI, 2, 4))
+                dirShadowSettings.mCascadeCount = static_cast<uint32_t>(cascadeCountUI);
+
+            ImGui::SliderFloat("Split Exponent", &dirShadowSettings.mCascadeSplitExponent, 1.1f, 5.0f, "%.2f");
+            ImGui::SliderFloat("Cascade Blend", &dirShadowSettings.mCascadeBlend, 0.0f, 0.5f, "%.3f");
+            ImGui::SliderFloat("Far Resolution Scale", &dirShadowSettings.mCascadeFarResolutionScale, 0.2f, 1.0f, "%.2f");
+            ImGui::SliderFloat("CSM PCF Radius", &dirShadowSettings.mPCFRadiusTexels, 0.0f, 4.0f, "%.2f");
+        }
 
         ImGui::Separator();
         ImGui::Text("Post Process");
@@ -343,6 +383,7 @@ int main()
             dir->SetDirection(glm::normalize(dirLightDirection));
             dir->SetColor(dirLightColor);
             dir->SetIntensity(dirLightIntensity);
+            dirShadowSettings.mTechnique = static_cast<core::ShadowTechnique>(shadowTechnique);
             dir->SetShadowSettings(dirShadowSettings);
         }
 

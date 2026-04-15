@@ -1,4 +1,5 @@
 ﻿#include "texture.hpp"
+#include "exrIO.hpp"
 #include "utils/logger.hpp"
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -6,12 +7,156 @@
 #include <filesystem>
 #include <utility>
 #include <vector>
+#include <cmath>
+#include <glm/glm.hpp>
 
 namespace core
 {
     namespace detail
     {
         const std::filesystem::path TextureRoot = "../../../assets/texture/";
+        const std::filesystem::path EnvRoot = "../../../assets/env/";
+
+        constexpr float Pi = 3.14159265359f;
+
+        glm::vec3 CubemapDirectionFromFaceUV(size_t faceIndex, float u, float v)
+        {
+            switch (faceIndex)
+            {
+            case 0: // +X
+                return glm::normalize(glm::vec3(1.0f, -v, -u));
+            case 1: // -X
+                return glm::normalize(glm::vec3(-1.0f, -v, u));
+            case 2: // +Y
+                return glm::normalize(glm::vec3(u, 1.0f, v));
+            case 3: // -Y
+                return glm::normalize(glm::vec3(u, -1.0f, -v));
+            case 4: // +Z
+                return glm::normalize(glm::vec3(u, -v, 1.0f));
+            default: // 5 -Z
+                return glm::normalize(glm::vec3(-u, -v, -1.0f));
+            }
+        }
+
+        glm::vec2 DirectionToEquirectUV(const glm::vec3 &dir)
+        {
+            const glm::vec3 n = glm::normalize(dir);
+            const float u = std::atan2(n.z, n.x) / (2.0f * Pi) + 0.5f;
+            const float v = std::asin(glm::clamp(n.y, -1.0f, 1.0f)) / Pi + 0.5f;
+            return glm::vec2(u, v);
+        }
+
+        glm::vec4 SampleEquirectBilinear(const std::vector<float> &pixels, int width, int height, const glm::vec2 &uv)
+        {
+            const float fu = glm::fract(uv.x);
+            const float fv = glm::clamp(uv.y, 0.0f, 1.0f);
+
+            const float x = fu * static_cast<float>(width - 1);
+            const float y = fv * static_cast<float>(height - 1);
+
+            const int x0 = static_cast<int>(std::floor(x));
+            const int y0 = static_cast<int>(std::floor(y));
+            const int x1 = (x0 + 1) % width;
+            const int y1 = std::min(y0 + 1, height - 1);
+
+            const float tx = x - static_cast<float>(x0);
+            const float ty = y - static_cast<float>(y0);
+
+            auto Load = [&](int ix, int iy) -> glm::vec4
+            {
+                const size_t i = (static_cast<size_t>(iy) * static_cast<size_t>(width) + static_cast<size_t>(ix)) * 4u;
+                return glm::vec4(pixels[i + 0u], pixels[i + 1u], pixels[i + 2u], pixels[i + 3u]);
+            };
+
+            const glm::vec4 c00 = Load(x0, y0);
+            const glm::vec4 c10 = Load(x1, y0);
+            const glm::vec4 c01 = Load(x0, y1);
+            const glm::vec4 c11 = Load(x1, y1);
+
+            const glm::vec4 c0 = glm::mix(c00, c10, tx);
+            const glm::vec4 c1 = glm::mix(c01, c11, tx);
+            return glm::mix(c0, c1, ty);
+        }
+    }
+
+    bool Texture::UploadRGBA16F(const float *pixels, uint32_t width, uint32_t height, const CreateInfo &info) noexcept
+    {
+        if (!pixels || width == 0 || height == 0)
+            return false;
+
+        if (mTextureID == 0)
+            glGenTextures(1, &mTextureID);
+
+        glBindTexture(GL_TEXTURE_2D, mTextureID);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+        glTexImage2D(GL_TEXTURE_2D,
+                     0,
+                     GL_RGBA16F,
+                     static_cast<GLsizei>(width),
+                     static_cast<GLsizei>(height),
+                     0,
+                     GL_RGBA,
+                     GL_FLOAT,
+                     pixels);
+
+        mTarget = GL_TEXTURE_2D;
+        if (NeedsMipmap(info.__minFilter__))
+            glGenerateMipmap(GL_TEXTURE_2D);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, info.__wrapS__);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, info.__wrapT__);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, info.__magFilter__);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, info.__minFilter__);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        mWidth = width;
+        mHeight = height;
+        return true;
+    }
+
+    bool Texture::UploadCubemapRGBA16F(const std::array<const float *, 6> &facePixels, uint32_t width, uint32_t height) noexcept
+    {
+        if (width == 0 || height == 0)
+            return false;
+
+        for (const auto *p : facePixels)
+        {
+            if (!p)
+                return false;
+        }
+
+        if (mTextureID == 0)
+            glGenTextures(1, &mTextureID);
+
+        mTarget = GL_TEXTURE_CUBE_MAP;
+        glBindTexture(GL_TEXTURE_CUBE_MAP, mTextureID);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+        for (size_t i = 0; i < facePixels.size(); ++i)
+        {
+            glTexImage2D(static_cast<GLenum>(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i),
+                         0,
+                         GL_RGBA16F,
+                         static_cast<GLsizei>(width),
+                         static_cast<GLsizei>(height),
+                         0,
+                         GL_RGBA,
+                         GL_FLOAT,
+                         facePixels[i]);
+        }
+
+        glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
+        mWidth = width;
+        mHeight = height;
+        return true;
     }
 
     void Texture::Release() noexcept
@@ -142,6 +287,19 @@ namespace core
 
         if (std::filesystem::exists(path)) // 如果相对路径在当前目录存在
             return path;
+
+        const std::string ext = path.extension().string();
+        const bool isExr = (ext == ".exr" || ext == ".EXR");
+        if (isExr)
+        {
+            const std::filesystem::path pEnv0 = detail::EnvRoot / path;
+            if (std::filesystem::exists(pEnv0))
+                return pEnv0;
+
+            const std::filesystem::path pEnv1 = detail::EnvRoot / path.filename();
+            if (std::filesystem::exists(pEnv1))
+                return pEnv1;
+        }
 
         const std::filesystem::path p2 = detail::TextureRoot / path; // 尝试资源根目录+相对路径
         if (std::filesystem::exists(p2))
@@ -306,10 +464,24 @@ namespace core
         info.__magFilter__ = GL_LINEAR;
         info.__minFilter__ = GL_LINEAR;
 
-        auto tex = std::make_shared<Texture>(path, 0u, baseDir, info);
-        if (!tex->IsValid())
-            return nullptr;
-        return tex;
+        const std::filesystem::path resolved = ResolveTexturePath(path, baseDir);
+        const std::string ext = resolved.extension().string();
+        if (ext == ".exr" || ext == ".EXR")
+        {
+            ExrImage image{};
+            if (!LoadExrImage(resolved, image))
+                return nullptr;
+
+            auto tex = std::shared_ptr<Texture>(new Texture());
+            tex->mUnit = 0u;
+            tex->mDebugName = resolved.generic_string();
+            if (!tex->UploadRGBA16F(image.mPixels.data(), static_cast<uint32_t>(image.mWidth), static_cast<uint32_t>(image.mHeight), info))
+                return nullptr;
+            return tex;
+        }
+
+        auto tex = std::make_shared<Texture>(resolved, 0u, std::filesystem::path{}, info);
+        return tex->IsValid() ? tex : nullptr;
     }
 
     std::shared_ptr<Texture> Texture::CreateCubemap(const std::array<std::filesystem::path, 6> &cubeFacePaths, const std::filesystem::path &baseDir)
@@ -385,6 +557,111 @@ namespace core
         }
 
         freeFaces();
+        return tex;
+    }
+
+    std::shared_ptr<Texture> Texture::CreateCubemapFromPanorama(const std::filesystem::path &panoramaPath,
+                                                                const std::filesystem::path &baseDir,
+                                                                uint32_t cubeSize)
+    {
+        const std::filesystem::path resolved = ResolveTexturePath(panoramaPath, baseDir);
+        std::vector<float> panoPixels{};
+        int panoW = 0;
+        int panoH = 0;
+
+        const std::string ext = resolved.extension().string();
+        if (ext == ".exr" || ext == ".EXR")
+        {
+            ExrImage image{};
+            if (!LoadExrImage(resolved, image))
+                return nullptr;
+
+            panoW = image.mWidth;
+            panoH = image.mHeight;
+            if (image.mChannels == 4)
+            {
+                panoPixels = std::move(image.mPixels);
+            }
+            else
+            {
+                panoPixels.resize(static_cast<size_t>(panoW) * static_cast<size_t>(panoH) * 4u, 1.0f);
+                for (int y = 0; y < panoH; ++y)
+                {
+                    for (int x = 0; x < panoW; ++x)
+                    {
+                        const size_t i3 = (static_cast<size_t>(y) * static_cast<size_t>(panoW) + static_cast<size_t>(x)) * 3u;
+                        const size_t i4 = (static_cast<size_t>(y) * static_cast<size_t>(panoW) + static_cast<size_t>(x)) * 4u;
+                        panoPixels[i4 + 0u] = image.mPixels[i3 + 0u];
+                        panoPixels[i4 + 1u] = image.mPixels[i3 + 1u];
+                        panoPixels[i4 + 2u] = image.mPixels[i3 + 2u];
+                        panoPixels[i4 + 3u] = 1.0f;
+                    }
+                }
+            }
+        }
+        else
+        {
+            int channels = 0;
+            stbi_set_flip_vertically_on_load(1);
+            float *pixels = stbi_loadf(resolved.string().c_str(), &panoW, &panoH, &channels, 4);
+            stbi_set_flip_vertically_on_load(0);
+            if (!pixels)
+            {
+                GL_ERROR("[Texture] Panorama Load Failed: {} | {}", resolved.string(), stbi_failure_reason() ? stbi_failure_reason() : "Unknown");
+                return nullptr;
+            }
+
+            panoPixels.assign(pixels, pixels + static_cast<size_t>(panoW) * static_cast<size_t>(panoH) * 4u);
+            stbi_image_free(pixels);
+        }
+
+        if (panoW <= 0 || panoH <= 0 || panoPixels.empty())
+            return nullptr;
+
+        const uint32_t size = std::max(cubeSize, 16u);
+        std::array<std::vector<float>, 6> faceData{};
+        for (auto &face : faceData)
+            face.resize(static_cast<size_t>(size) * static_cast<size_t>(size) * 4u, 1.0f);
+
+        for (size_t face = 0; face < 6u; ++face)
+        {
+            for (uint32_t y = 0; y < size; ++y)
+            {
+                for (uint32_t x = 0; x < size; ++x)
+                {
+                    const float u = (2.0f * (static_cast<float>(x) + 0.5f) / static_cast<float>(size)) - 1.0f;
+                    const float v = (2.0f * (static_cast<float>(y) + 0.5f) / static_cast<float>(size)) - 1.0f;
+                    const glm::vec3 dir = detail::CubemapDirectionFromFaceUV(face, u, v);
+                    const glm::vec2 uv = detail::DirectionToEquirectUV(dir);
+                    const glm::vec4 c = detail::SampleEquirectBilinear(panoPixels, panoW, panoH, uv);
+
+                    const size_t i = (static_cast<size_t>(y) * static_cast<size_t>(size) + static_cast<size_t>(x)) * 4u;
+                    faceData[face][i + 0u] = c.r;
+                    faceData[face][i + 1u] = c.g;
+                    faceData[face][i + 2u] = c.b;
+                    faceData[face][i + 3u] = c.a;
+                }
+            }
+        }
+
+        auto tex = std::shared_ptr<Texture>(new Texture());
+        tex->mUnit = 0u;
+        tex->mDebugName = resolved.generic_string();
+
+        std::array<const float *, 6> facePtrs{
+            faceData[0].data(),
+            faceData[1].data(),
+            faceData[2].data(),
+            faceData[3].data(),
+            faceData[4].data(),
+            faceData[5].data()};
+
+        if (!tex->UploadCubemapRGBA16F(facePtrs, size, size))
+        {
+            GL_ERROR("[Texture] Panorama->Cubemap Upload Failed: {}", resolved.string());
+            return nullptr;
+        }
+
         return tex;
     }
 }

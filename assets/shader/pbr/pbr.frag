@@ -5,7 +5,7 @@ out vec4 oPixelColor;
 in vec2 oUV;
 in vec3 oNormal;
 in vec3 oFragPos;
-in mat3 oTBN;
+in vec3 oTangent;
 in vec4 oFragPosLightSpace;
 
 uniform sampler2D uAlbedoSampler;
@@ -37,6 +37,9 @@ uniform sampler2D uShadowMapSampler;
 uniform sampler2DArray uShadowMapArraySampler;
 uniform samplerCube uPointShadowCubeSampler;
 uniform sampler2D uSpotShadowMapSampler;
+uniform samplerCube uIrradianceMap;
+uniform samplerCube uPrefilterMap;
+uniform sampler2D uBrdfLut;
 uniform uint uHasDirectionalShadow = 0u;
 uniform uint uHasDirectionalCSM = 0u;
 uniform uint uHasPointShadow = 0u;
@@ -64,8 +67,15 @@ void main()
     vec3 N = normalize(oNormal);
     if ((uMaterialFlags & MAT_HAS_NORMAL_TEX) != 0u)
     {
+        vec3 T = normalize(oTangent);
+        
+        // Gram-Schmidt 正交化
+        T = normalize(T - N * dot(T, N));
+        vec3 B = cross(N, T);
+        mat3 TBN = mat3(T, B, N);
+        
         vec3 nTex = texture(uNormalSampler, oUV).rgb * 2.0 - vec3(1.0);
-        vec3 mapped = normalize(oTBN * nTex);
+        vec3 mapped = normalize(TBN * nTex);
         N = normalize(mix(N, mapped, clamp(uNormalStrength, 0.0, 1.0)));
     }
     
@@ -167,8 +177,21 @@ void main()
         
         color += EvaluateBRDF(N, V, L, radiance, albedo, metallic, roughness) * (1.0 - shadow);
     }
+    // TODO Energy Compensation
+    vec3 F0 = mix(vec3(0.04), albedo, metallic);
+    vec3 F = FresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
+    vec3 kS = F;
+    vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
     
-    vec3 ambient = 0.03 * albedo;
+    vec3 irradiance = texture(uIrradianceMap, N).rgb;
+    vec3 diffuseIBL = irradiance * albedo;
+    
+    vec3 R = reflect(-V, N);
+    const float maxMip = float(max(textureQueryLevels(uPrefilterMap) - 1, 0));
+    vec3 prefilteredColor = textureLod(uPrefilterMap, R, roughness * maxMip).rgb;
+    vec2 brdf = texture(uBrdfLut, vec2(max(dot(N, V), 0.0), roughness)).rg;
+    vec3 specularIBL = prefilteredColor * (F * brdf.x + brdf.y);
+    
+    vec3 ambient = kD * diffuseIBL + specularIBL;
     oPixelColor = vec4(color + ambient, 1.0);
 }
-

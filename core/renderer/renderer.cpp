@@ -5,6 +5,7 @@
 #include "pass/forwardTransparentPass.hpp"
 #include "pass/lightProxyPass.hpp"
 #include "pass/postProcessPass.hpp"
+#include "texture/environmentMap.hpp"
 #include "utils/logger.hpp"
 #include <algorithm>
 #include <memory>
@@ -112,6 +113,30 @@ namespace core
         context.__targetHeight__ = mTargetHeight;
 
         scene.UpdateWorldMatrices();
+
+        if (scene.IsSkyboxEnabled())
+        {
+            const auto &skybox = scene.GetSkybox();
+            if (skybox && skybox->IsValid())
+            {
+                if (mIblPrecompute.Prepare(*skybox) && skybox->HasIblMaps())
+                {
+                    mBackend.SetIblMaps(skybox->GetIrradianceMap(), skybox->GetPrefilterMap(), skybox->GetBrdfLut());
+                    mLastIblEnvKey = skybox->GetCacheKey();
+                }
+            }
+            else
+            {
+                mBackend.ClearIblMaps();
+                mLastIblEnvKey.clear();
+            }
+        }
+        else
+        {
+            mBackend.ClearIblMaps();
+            mLastIblEnvKey.clear();
+        }
+
         context.__renderQueue__.Build(scene, camera);
 
         mBackend.SetClearColor(mClearColor);

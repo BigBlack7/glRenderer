@@ -51,6 +51,12 @@ namespace core
         /// @return 是否上传成功
         bool UploadCubemapRGBA8(const std::array<const unsigned char *, 6> &facePixels, uint32_t width, uint32_t height) noexcept;
 
+        /// @brief 上传RGBA16F格式像素数据到GPU
+        bool UploadRGBA16F(const float *pixels, uint32_t width, uint32_t height, const CreateInfo &info) noexcept;
+
+        /// @brief 上传CubeMap RGBA16F格式像素数据到GPU
+        bool UploadCubemapRGBA16F(const std::array<const float *, 6> &facePixels, uint32_t width, uint32_t height) noexcept;
+
         /// @brief 判断是否需要生成Mipmap
         /// @param minFilter 最小过滤参数
         /// @return 是否需要生成Mipmap
@@ -122,5 +128,8 @@ namespace core
         // Environment Map
         static std::shared_ptr<Texture> CreatePanorama(const std::filesystem::path &path, const std::filesystem::path &baseDir = {});
         static std::shared_ptr<Texture> CreateCubemap(const std::array<std::filesystem::path, 6> &cubeFacePaths, const std::filesystem::path &baseDir = {});
+        static std::shared_ptr<Texture> CreateCubemapFromPanorama(const std::filesystem::path &panoramaPath,
+                                                                  const std::filesystem::path &baseDir = {},
+                                                                  uint32_t cubeSize = 1024u);
     };
 }

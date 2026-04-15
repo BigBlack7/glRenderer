@@ -9,7 +9,7 @@ namespace core
 {
     bool SkyboxPass::EnsureInit()
     {
-        if (mShader && mShader->GetID() != 0 && mCube && mCube->IsValid())
+        if (mShader && mShader->GetID() != 0 && mSphere && mSphere->IsValid())
             return true;
 
         if (mInitTried)
@@ -17,9 +17,9 @@ namespace core
 
         mInitTried = true;
         mShader = std::make_shared<Shader>("pass/skybox.vert", "pass/skybox.frag");
-        mCube = Mesh::CreateCube(1.f);
+        mSphere = Mesh::CreateSphere(1.f, 64u, 64u);
 
-        return mShader && mShader->GetID() != 0 && mCube && mCube->IsValid();
+        return mShader && mShader->GetID() != 0 && mSphere && mSphere->IsValid();
     }
 
     void SkyboxPass::Execute(FrameContext &ctx, RenderBackend &backend)
@@ -49,7 +49,7 @@ namespace core
         backend.ApplyPassState(skyState);
 
         backend.UploadFrameBlock(*ctx.__camera__, ctx.__timeSec__);
-        backend.DrawSkybox(*mShader, *mCube, *skybox, ctx.__scene__->GetSkyboxIntensity(), ctx.__stats__);
+        backend.DrawSkybox(*mShader, *mSphere, *skybox, ctx.__scene__->GetSkyboxIntensity(), ctx.__stats__);
 
         backend.EndRenderTarget();
     }

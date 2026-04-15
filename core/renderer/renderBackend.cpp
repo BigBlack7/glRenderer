@@ -228,6 +228,9 @@ namespace core
         mSpotLightSpaceVP = glm::mat4(1.f);
         mSpotShadowBiasConstant = 0.0008f;
         mSpotShadowBiasSlope = 0.002f;
+        mIblIrradianceMap = 0;
+        mIblPrefilterMap = 0;
+        mIblBrdfLut = 0;
 
         // 初始化默认渲染状态 - 不透明状态
         mHasAppliedState = false;
@@ -265,6 +268,9 @@ namespace core
         mSpotLightSpaceVP = glm::mat4(1.f);
         mSpotShadowBiasConstant = 0.0008f;
         mSpotShadowBiasSlope = 0.002f;
+        mIblIrradianceMap = 0;
+        mIblPrefilterMap = 0;
+        mIblBrdfLut = 0;
         mInitialized = false;
         mHasAppliedState = false;
 
@@ -496,6 +502,31 @@ namespace core
             shader.SetUIntOptional(name, value);
         for (const auto &[name, value] : material.GetVec3Params())
             shader.SetVec3Optional(name, value);
+
+        const GLint irradianceLoc = shader.FindUniformLocation("uIrradianceMap");
+        const GLint prefilterLoc = shader.FindUniformLocation("uPrefilterMap");
+        const GLint brdfLutLoc = shader.FindUniformLocation("uBrdfLut");
+
+        if (irradianceLoc >= 0)
+        {
+            if (mStateCache.BindTextureCube(IblIrradianceTextureUnit, mIblIrradianceMap))
+                ++stats.__textureBinds__;
+            shader.SetInt(irradianceLoc, static_cast<int>(IblIrradianceTextureUnit));
+        }
+
+        if (prefilterLoc >= 0)
+        {
+            if (mStateCache.BindTextureCube(IblPrefilterTextureUnit, mIblPrefilterMap))
+                ++stats.__textureBinds__;
+            shader.SetInt(prefilterLoc, static_cast<int>(IblPrefilterTextureUnit));
+        }
+
+        if (brdfLutLoc >= 0)
+        {
+            if (mStateCache.BindTexture2D(IblBrdfLutTextureUnit, mIblBrdfLut))
+                ++stats.__textureBinds__;
+            shader.SetInt(brdfLutLoc, static_cast<int>(IblBrdfLutTextureUnit));
+        }
     }
 
     void RenderBackend::DrawMesh(const Mesh &mesh, RenderProfiler &stats)
@@ -1121,6 +1152,20 @@ namespace core
         mSpotShadowBiasSlope = 0.002f;
     }
 
+    void RenderBackend::SetIblMaps(GLuint irradianceMap, GLuint prefilterMap, GLuint brdfLut)
+    {
+        mIblIrradianceMap = irradianceMap;
+        mIblPrefilterMap = prefilterMap;
+        mIblBrdfLut = brdfLut;
+    }
+
+    void RenderBackend::ClearIblMaps()
+    {
+        mIblIrradianceMap = 0;
+        mIblPrefilterMap = 0;
+        mIblBrdfLut = 0;
+    }
+
     void RenderBackend::ApplyShadowGlobals(const Shader &shader, RenderProfiler &stats)
     {
         const bool hasCSM = (mDirectionalShadowArrayTexture != 0 && mDirectionalCascadeCount > 0);
@@ -1218,25 +1263,11 @@ namespace core
         BindProgramBlocks(shader);
 
         constexpr uint32_t cubeUnit = 0u;
-        constexpr uint32_t panoUnit = 1u;
-
         shader.SetInt("uSkyboxCube", static_cast<int>(cubeUnit));
-        shader.SetInt("uSkyboxPanorama", static_cast<int>(panoUnit));
-        shader.SetInt("uSkyMode", skybox.IsCubeMap() ? 0 : 1);
         shader.SetFloat("uSkyboxIntensity", intensity);
 
-        if (skybox.IsCubeMap())
-        {
-            if (mStateCache.BindTexture2D(cubeUnit, skybox.GetID()))
-                ++stats.__textureBinds__;
-            mStateCache.BindTexture2D(panoUnit, 0);
-        }
-        else
-        {
-            mStateCache.BindTexture2D(cubeUnit, 0);
-            if (mStateCache.BindTexture2D(panoUnit, skybox.GetID()))
-                ++stats.__textureBinds__;
-        }
+        if (mStateCache.BindTextureCube(cubeUnit, skybox.GetID()))
+            ++stats.__textureBinds__;
 
         DrawMesh(cube, stats);
     }

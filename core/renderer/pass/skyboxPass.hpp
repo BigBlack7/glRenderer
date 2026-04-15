@@ -11,7 +11,7 @@ namespace core
     {
     private:
         std::shared_ptr<Shader> mShader{};
-        std::shared_ptr<Mesh> mCube{};
+        std::shared_ptr<Mesh> mSphere{};
         bool mInitTried{false};
 
         bool EnsureInit();

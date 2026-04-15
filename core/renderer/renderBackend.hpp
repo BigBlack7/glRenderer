@@ -83,6 +83,13 @@ namespace core
         float mSpotShadowBiasConstant{0.0008f}; // 聚光阴影常量偏移
         float mSpotShadowBiasSlope{0.002f};     // 聚光阴影坡度偏移
 
+        static constexpr uint32_t IblIrradianceTextureUnit = 11u;
+        static constexpr uint32_t IblPrefilterTextureUnit = 10u;
+        static constexpr uint32_t IblBrdfLutTextureUnit = 9u;
+        GLuint mIblIrradianceMap{0};
+        GLuint mIblPrefilterMap{0};
+        GLuint mIblBrdfLut{0};
+
     private:
         /// @brief 为着色器程序绑定uniform block到指定槽位
         /// @param shader 目标着色器
@@ -233,6 +240,9 @@ namespace core
 
         /// @brief 清理聚光阴影图资源
         void ClearSpotShadow();
+
+        void SetIblMaps(GLuint irradianceMap, GLuint prefilterMap, GLuint brdfLut);
+        void ClearIblMaps();
 
         /// @brief 绘制全屏纹理
         /// @param shader 着色器程序

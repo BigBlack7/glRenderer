@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "camera/camera.hpp"
 #include "renderBackend.hpp"
+#include "iblPrecompute.hpp"
 #include "rendergraph.hpp"
 #include "buffer/frameBuffer.hpp"
 #include "pass/postProcessPass.hpp"
@@ -24,6 +25,8 @@ namespace core
         uint32_t mTargetWidth{0};
         uint32_t mTargetHeight{0};
         PostProcessSettings mPostProcessSettings{};
+        IblPrecompute mIblPrecompute{};
+        std::string mLastIblEnvKey{};
 
     private:
         /// @brief 确保渲染器已初始化

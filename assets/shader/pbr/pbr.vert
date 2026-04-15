@@ -2,7 +2,7 @@
 layout(location = 0)in vec3 lPosition;
 layout(location = 1)in vec2 lUV;
 layout(location = 2)in vec3 lNormal;
-layout(location = 3)in vec3 lTangent;
+layout(location = 3)in vec3 lTangent; // (MikkTSpace)切线空间的切线向量, w分量隐含了切线的方向(正或负)
 
 // instancing attributes
 layout(location = 4)in vec4 iM0;
@@ -17,7 +17,7 @@ layout(location = 10)in vec4 iN2;
 out vec2 oUV;
 out vec3 oNormal;
 out vec3 oFragPos;
-out mat3 oTBN;
+out vec3 oTangent;
 out vec4 oFragPosLightSpace;
 
 layout(std140, binding = 0)uniform FrameBlock
@@ -51,8 +51,5 @@ void main()
     oNormal = normalize(normalMat * lNormal);
     oFragPosLightSpace = uLightSpaceVP * worldPos;
     
-    vec3 T = normalize(mat3(model) * lTangent);
-    vec3 B = normalize(cross(oNormal, T));
-    oTBN = mat3(T, B, oNormal);
+    oTangent = normalize(normalMat * lTangent);
 }
-
