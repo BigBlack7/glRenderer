@@ -48,7 +48,9 @@ namespace core
         return outImage.IsValid();
     }
 
-    bool SaveExrImage(const std::filesystem::path &filePath, const ExrImage &image) noexcept
+    bool SaveExrImage(const std::filesystem::path &filePath,
+                      const ExrImage &image,
+                      ExrSavePixelType savePixelType) noexcept
     {
         if (!image.IsValid())
         {
@@ -150,7 +152,9 @@ namespace core
         for (int i = 0; i < channels; ++i)
         {
             header.pixel_types[i] = TINYEXR_PIXELTYPE_FLOAT;
-            header.requested_pixel_types[i] = TINYEXR_PIXELTYPE_HALF;
+            header.requested_pixel_types[i] = (savePixelType == ExrSavePixelType::Float32)
+                                                  ? TINYEXR_PIXELTYPE_FLOAT
+                                                  : TINYEXR_PIXELTYPE_HALF;
         }
 
         const char *error = nullptr;

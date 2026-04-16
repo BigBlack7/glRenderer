@@ -4,6 +4,12 @@
 
 namespace core
 {
+    enum class ExrSavePixelType : uint8_t
+    {
+        Half16 = 0,
+        Float32 = 1
+    };
+
     struct ExrImage final
     {
         int mWidth{0};
@@ -19,5 +25,7 @@ namespace core
     };
 
     bool LoadExrImage(const std::filesystem::path &filePath, ExrImage &outImage) noexcept;
-    bool SaveExrImage(const std::filesystem::path &filePath, const ExrImage &image) noexcept;
+    bool SaveExrImage(const std::filesystem::path &filePath,
+                      const ExrImage &image,
+                      ExrSavePixelType savePixelType = ExrSavePixelType::Half16) noexcept;
 }

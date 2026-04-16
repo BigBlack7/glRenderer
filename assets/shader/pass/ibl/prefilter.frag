@@ -5,6 +5,7 @@ out vec4 oPixelColor;
 uniform samplerCube uEnvironmentMap;
 uniform float uRoughness;
 uniform float uEnvMapResolution;
+uniform float uPrefilterMaxMip;
 
 const float PI = 3.14159265359;
 const float INV_UINT32 = 1.0 / 4294967296.0;
@@ -65,10 +66,10 @@ void main()
     const uint sampleCount = 1024u;
     vec3 prefiltered = vec3(0.0);
     float totalWeight = 0.0;
-    float roughness = max(uRoughness, 0.04);
+    float roughness = clamp(uRoughness, 0.0, 1.0);
     float envArea = 6.0 * uEnvMapResolution * uEnvMapResolution;
     float saTexel = 4.0 * PI / max(envArea, 1.0);
-    float maxMip = float(max(textureQueryLevels(uEnvironmentMap) - 1, 0));
+    float maxMip = max(uPrefilterMaxMip, 0.0);
     
     for(uint i = 0u; i < sampleCount; ++ i)
     {
@@ -85,7 +86,7 @@ void main()
             float pdf = d * ndoth / max(4.0 * hdotv, 0.0001) + 0.0001;
             
             float saSample = 1.0 / (float(sampleCount) * pdf + 0.0001);
-            float mipLevel = (roughness <= 0.04) ? 0.0 : 0.5 * log2(saSample / saTexel);
+            float mipLevel = (roughness <= 0.0001) ? 0.0 : 0.5 * log2(saSample / saTexel);
             mipLevel = clamp(mipLevel, 0.0, maxMip);
             
             prefiltered += textureLod(uEnvironmentMap, l, mipLevel).rgb * ndotl;

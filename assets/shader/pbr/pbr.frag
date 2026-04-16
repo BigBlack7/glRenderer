@@ -40,6 +40,7 @@ uniform sampler2D uSpotShadowMapSampler;
 uniform samplerCube uIrradianceMap;
 uniform samplerCube uPrefilterMap;
 uniform sampler2D uBrdfLut;
+uniform float uPrefilterMaxMip = 4.0;
 uniform uint uHasDirectionalShadow = 0u;
 uniform uint uHasDirectionalCSM = 0u;
 uniform uint uHasPointShadow = 0u;
@@ -187,8 +188,14 @@ void main()
     vec3 diffuseIBL = irradiance * albedo;
     
     vec3 R = reflect(-V, N);
-    const float maxMip = float(max(textureQueryLevels(uPrefilterMap) - 1, 0));
-    vec3 prefilteredColor = textureLod(uPrefilterMap, R, roughness * maxMip).rgb;
+    float maxMip = max(uPrefilterMaxMip, 0.0);
+    float lod = clamp(roughness * maxMip, 0.0, maxMip);
+    float mip0 = floor(lod);
+    float mip1 = min(mip0 + 1.0, maxMip);
+    float mipT = lod - mip0;
+    vec3 prefiltered0 = textureLod(uPrefilterMap, R, mip0).rgb;
+    vec3 prefiltered1 = textureLod(uPrefilterMap, R, mip1).rgb;
+    vec3 prefilteredColor = mix(prefiltered0, prefiltered1, mipT);
     vec2 brdf = texture(uBrdfLut, vec2(max(dot(N, V), 0.0), roughness)).rg;
     vec3 specularIBL = prefilteredColor * (F * brdf.x + brdf.y);
     

@@ -49,6 +49,8 @@ namespace core
 
         glBindTextureUnit(unit, textureID);
         mTexture2D[unit] = textureID; // 更新缓存状态
+        mTexture2DArray[unit] = 0;
+        mTextureCube[unit] = 0;
         return true;
     }
 
@@ -62,6 +64,8 @@ namespace core
 
         glBindTextureUnit(unit, textureID);
         mTexture2DArray[unit] = textureID;
+        mTexture2D[unit] = 0;
+        mTextureCube[unit] = 0;
         return true;
     }
 
@@ -75,6 +79,8 @@ namespace core
 
         glBindTextureUnit(unit, textureID);
         mTextureCube[unit] = textureID;
+        mTexture2D[unit] = 0;
+        mTexture2DArray[unit] = 0;
         return true;
     }
 }

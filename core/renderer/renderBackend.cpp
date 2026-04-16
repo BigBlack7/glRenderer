@@ -231,6 +231,7 @@ namespace core
         mIblIrradianceMap = 0;
         mIblPrefilterMap = 0;
         mIblBrdfLut = 0;
+        mIblPrefilterMaxMip = 4.0f;
 
         // 初始化默认渲染状态 - 不透明状态
         mHasAppliedState = false;
@@ -271,6 +272,7 @@ namespace core
         mIblIrradianceMap = 0;
         mIblPrefilterMap = 0;
         mIblBrdfLut = 0;
+        mIblPrefilterMaxMip = 4.0f;
         mInitialized = false;
         mHasAppliedState = false;
 
@@ -527,6 +529,8 @@ namespace core
                 ++stats.__textureBinds__;
             shader.SetInt(brdfLutLoc, static_cast<int>(IblBrdfLutTextureUnit));
         }
+
+        shader.SetFloatOptional("uPrefilterMaxMip", mIblPrefilterMaxMip);
     }
 
     void RenderBackend::DrawMesh(const Mesh &mesh, RenderProfiler &stats)
@@ -1157,6 +1161,22 @@ namespace core
         mIblIrradianceMap = irradianceMap;
         mIblPrefilterMap = prefilterMap;
         mIblBrdfLut = brdfLut;
+
+        int mipLevels = 0;
+        if (mIblPrefilterMap != 0)
+        {
+            glBindTexture(GL_TEXTURE_CUBE_MAP, mIblPrefilterMap);
+            for (int level = 0; level < 16; ++level)
+            {
+                GLint w = 0;
+                glGetTexLevelParameteriv(GL_TEXTURE_CUBE_MAP_POSITIVE_X, level, GL_TEXTURE_WIDTH, &w);
+                if (w <= 0)
+                    break;
+                ++mipLevels;
+            }
+            glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+        }
+        mIblPrefilterMaxMip = static_cast<float>(std::max(mipLevels - 1, 0));
     }
 
     void RenderBackend::ClearIblMaps()
@@ -1164,6 +1184,7 @@ namespace core
         mIblIrradianceMap = 0;
         mIblPrefilterMap = 0;
         mIblBrdfLut = 0;
+        mIblPrefilterMaxMip = 4.0f;
     }
 
     void RenderBackend::ApplyShadowGlobals(const Shader &shader, RenderProfiler &stats)

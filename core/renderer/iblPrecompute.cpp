@@ -170,7 +170,9 @@ namespace core
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, generateMipmap ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_BASE_LEVEL, 0);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAX_LEVEL, static_cast<GLint>(std::max(1u, mipLevels) - 1u));
 
         if (generateMipmap)
             glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
@@ -267,6 +269,7 @@ namespace core
         mPrefilterShader->SetMat4("uProjection", proj);
         mPrefilterShader->SetInt("uEnvironmentMap", 0);
         mPrefilterShader->SetFloat("uEnvMapResolution", envResolution);
+        mPrefilterShader->SetFloat("uPrefilterMaxMip", static_cast<float>(std::max(1u, mipLevels) - 1u));
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_CUBE_MAP, sourceEnvCube);
@@ -338,7 +341,7 @@ namespace core
             image.mHeight = static_cast<int>(IrradianceSize);
             image.mChannels = 4;
             image.mPixels = std::move(rgba);
-            if (!SaveExrImage(dir / ("irradiance_" + std::string(faces[face]) + ".exr"), image))
+            if (!SaveExrImage(dir / ("irradiance_" + std::string(faces[face]) + ".exr"), image, ExrSavePixelType::Float32))
                 return false;
         }
 
@@ -356,7 +359,7 @@ namespace core
                 image.mHeight = static_cast<int>(size);
                 image.mChannels = 4;
                 image.mPixels = std::move(rgba);
-                if (!SaveExrImage(dir / ("prefilter_m" + std::to_string(mip) + "_" + std::string(faces[face]) + ".exr"), image))
+                if (!SaveExrImage(dir / ("prefilter_m" + std::to_string(mip) + "_" + std::string(faces[face]) + ".exr"), image, ExrSavePixelType::Float32))
                     return false;
             }
         }
@@ -383,7 +386,7 @@ namespace core
             }
         }
 
-        if (!SaveExrImage(dir / "brdf_lut_ggx_smith.exr", lut))
+        if (!SaveExrImage(dir / "brdf_lut_ggx_smith.exr", lut, ExrSavePixelType::Float32))
             return false;
 
         return true;
@@ -400,7 +403,10 @@ namespace core
         std::array<ExrImage, 6> irradianceFaces{};
         for (uint32_t face = 0; face < 6u; ++face)
         {
-            if (!LoadExrImage(dir / ("irradiance_" + std::string(faces[face]) + ".exr"), irradianceFaces[face]))
+            const auto facePath = dir / ("irradiance_" + std::string(faces[face]) + ".exr");
+            if (!std::filesystem::exists(facePath))
+                return false;
+            if (!LoadExrImage(facePath, irradianceFaces[face]))
                 return false;
         }
 
@@ -428,7 +434,13 @@ namespace core
             for (uint32_t face = 0; face < 6u; ++face)
             {
                 ExrImage img{};
-                if (!LoadExrImage(dir / ("prefilter_m" + std::to_string(mip) + "_" + std::string(faces[face]) + ".exr"), img))
+                const auto prefilterPath = dir / ("prefilter_m" + std::to_string(mip) + "_" + std::string(faces[face]) + ".exr");
+                if (!std::filesystem::exists(prefilterPath))
+                {
+                    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+                    return false;
+                }
+                if (!LoadExrImage(prefilterPath, img))
                 {
                     glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
                     return false;
@@ -448,7 +460,10 @@ namespace core
         glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 
         ExrImage lut{};
-        if (!LoadExrImage(dir / "brdf_lut_ggx_smith.exr", lut))
+        const auto lutPath = dir / "brdf_lut_ggx_smith.exr";
+        if (!std::filesystem::exists(lutPath))
+            return false;
+        if (!LoadExrImage(lutPath, lut))
             return false;
 
         GLuint brdf = CreateBrdfLutRG16F(static_cast<uint32_t>(lut.mWidth), static_cast<uint32_t>(lut.mHeight));
@@ -507,7 +522,12 @@ namespace core
             if (!ComputeBrdfLut(entry.mBrdfLut, BrdfLutSize, BrdfLutSize))
                 return false;
 
-            SaveToDisk(cacheKey, entry);
+            if (!SaveToDisk(cacheKey, entry))
+            {
+                GL_ERROR("[IBL] Cache Save Failed For Key: {}", cacheKey);
+                std::error_code ec;
+                std::filesystem::remove_all(CacheDirForKey(cacheKey), ec);
+            }
         }
 
         mRuntimeCache.emplace(cacheKey, entry);

@@ -89,6 +89,7 @@ namespace core
         GLuint mIblIrradianceMap{0};
         GLuint mIblPrefilterMap{0};
         GLuint mIblBrdfLut{0};
+        float mIblPrefilterMaxMip{4.0f};
 
     private:
         /// @brief 为着色器程序绑定uniform block到指定槽位
